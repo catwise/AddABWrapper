@@ -134,10 +134,12 @@ Mode2:
         set mdexTable = `echo $table`
 
         echo "Current input MDEXTable == "$mdexTable
-        echo Calling AddABWrapper.tcsh Mode3 on $table 
+        echo Calling AddABWrapper.tcsh Mode3 on ${table}\: 
 	if($rsyncSet == "true") then
+		echo "/Volumes/CatWISE1/ejmarchese/Dev/AddABWrapper/AddABWrapper.tcsh 3 $table $versionID $InputPath $OutputPath -rsync"
 		(echo y | /Volumes/CatWISE1/ejmarchese/Dev/AddABWrapper/AddABWrapper.tcsh 3 $table $versionID $InputPath $OutputPath -rsync) &
 	else
+		echo "/Volumes/CatWISE1/ejmarchese/Dev/AddABWrapper/AddABWrapper.tcsh 3 $table $versionID $InputPath $OutputPath"
 		(echo y | /Volumes/CatWISE1/ejmarchese/Dev/AddABWrapper/AddABWrapper.tcsh 3 $table $versionID $InputPath $OutputPath) &
 	endif
 	
