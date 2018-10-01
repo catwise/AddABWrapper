@@ -6,7 +6,7 @@ echo
 echo Wrapper Started at:
 echo $startTime
 echo
-echo Version 1.1 
+echo Version 1.2 
 echo
 echo This Wrapper will wrap around and run:
 echo 1\) do-add-ab_flags
@@ -218,9 +218,11 @@ Mode3:
 ###	#/Users/CatWISE/do-add-ab_flags.tcsh 1497p015 _opt1_20180609_083107 v0 
 ###     echo "/Users/CatWISE/do-add-ab_flags.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${InputPath} ${OutputPath}" 
 	echo John Fowler Program call:
-        echo "/Volumes/CatWISE1/ejmarchese/Dev/AddABWrapper/do-ab.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${InputPath} ${OutputPath}" 
+###      #echo "/Volumes/CatWISE1/ejmarchese/Dev/AddABWrapper/do-ab.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${InputPath} ${OutputPath}" 
+        echo "/Volumes/CatWISE1/jwf/ARTID/do-ab.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${InputPath} ${OutputPath}" 
 	echo
-	/Volumes/CatWISE1/ejmarchese/Dev/AddABWrapper/do-ab.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${InputPath} ${OutputPath}
+###	#/Volumes/CatWISE1/ejmarchese/Dev/AddABWrapper/do-ab.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${InputPath} ${OutputPath}
+	/Volumes/CatWISE1/jwf/ARTID/do-ab.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${InputPath} ${OutputPath}
 	set saved_status = $? 
 	#check exit status
 	echo stils saved_status == $saved_status 
