@@ -9,7 +9,7 @@ head -25 $5/$1$2_af.tbl > $7/$1-header-tmp.txt
  
 cat $7/$1-header-tmp.txt $7/$1-temp1.tbl > $7/$1-temp2.tbl
  
-/Users/CatWISE/addABflags/Add-ab_flags/add-ab_flags -i $7/$1-temp2.tbl -m $7/unwise-$1-msk.fits -o $7/$1$2_ab_$3.tbl > $7/ab-$1_$3.txt
+/Users/CatWISE/AddABflags/Add-ab_flags/add-ab_flags -i $7/$1-temp2.tbl -m $7/unwise-$1-msk.fits -o $7/$1$2_ab_$3.tbl > $7/ab-$1_$3.txt
  
 rm $7/$1-temp1.tbl
 rm $7/$1-temp2.tbl
