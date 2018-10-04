@@ -175,11 +175,11 @@ Mode2:
         echo "Current input MDEXTable == "$mdexTable
         echo Calling addABWrapper.tcsh Mode3 on ${table}\: 
 	if($rsyncSet == "true") then
-		echo "/Volumes/CatWISE1/ejmarchese/Dev/AddABWrapper/addABWrapper.tcsh 3 $table $versionID $mdexInputPath $af_InputPath $msk_InputPath $OutputPath -rsync"
-		(echo y | /Volumes/CatWISE1/ejmarchese/Dev/AddABWrapper/addABWrapper.tcsh 3 $table $versionID $mdexInputPath $af_InputPath $msk_InputPath $OutputPath -rsync) &
+		echo "${wrapperDir}/addABWrapper.tcsh 3 $table $versionID $mdexInputPath $af_InputPath $msk_InputPath $OutputPath -rsync"
+		(echo y | ${wrapperDir}/addABWrapper.tcsh 3 $table $versionID $mdexInputPath $af_InputPath $msk_InputPath $OutputPath -rsync) &
 	else
-		echo "/Volumes/CatWISE1/ejmarchese/Dev/AddABWrapper/addABWrapper.tcsh 3 $table $versionID $mdexInputPath $af_InputPath $msk_InputPath $OutputPath"
-		(echo y | /Volumes/CatWISE1/ejmarchese/Dev/AddABWrapper/addABWrapper.tcsh 3 $table $versionID $mdexInputPath $af_InputPath $msk_InputPath $OutputPath) &
+		echo "${wrapperDir}/addABWrapper.tcsh 3 $table $versionID $mdexInputPath $af_InputPath $msk_InputPath $OutputPath"
+		(echo y | ${wrapperDir}/addABWrapper.tcsh 3 $table $versionID $mdexInputPath $af_InputPath $msk_InputPath $OutputPath) &
 	endif
 	
 	set maxInParallel = 12
@@ -229,8 +229,8 @@ Mode3:
 
 	set originalTable = ${edited_mdexTablePATH}/${RadecID}${RestOfTablename}.tbl
 	echo "__________________________________________________________________________________________________"
-        echo "Current input MDEXTable == "$mdexTable
-        echo "Edited_Current input MDEXTable == "${edited_mdexTablePATH}//${edited_mdexTable}.tbl
+        echo "Current input afTable == "$mdexTable
+        echo "Edited_Current input afTable == "${edited_mdexTablePATH}//${edited_mdexTable}.tbl
         echo "RadecID == "$RadecID
 	echo "RestOfTablename == "$RestOfTablename
 	echo "versionID == "${versionID}
@@ -266,10 +266,10 @@ Mode3:
 ###	#/Users/CatWISE/do-add-ab_flags.tcsh 1497p015 _opt1_20180609_083107 v0 
 ###     echo "/Users/CatWISE/do-add-ab_flags.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${mdexInputPath} ${af_InputPath} ${msk_InputPath} ${OutputPath}" 
 	echo John Fowler Program call:
-      echo "/Volumes/CatWISE1/ejmarchese/Dev/AddABWrapper/do-ab.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${mdexInputPath} ${af_InputPath} ${msk_InputPath} ${OutputPath}" 
+      echo "${wrapperDir}/do-ab.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${mdexInputPath} ${af_InputPath} ${msk_InputPath} ${OutputPath}" 
 ###        echo "/Volumes/CatWISE1/jwf/ARTID/do-ab.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${mdexInputPath} ${af_InputPath} ${msk_InputPath} ${OutputPath}" 
 	echo
-	/Volumes/CatWISE1/ejmarchese/Dev/AddABWrapper/do-ab.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${mdexInputPath} ${af_InputPath} ${msk_InputPath} ${OutputPath}
+	${wrapperDir}/do-ab.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${mdexInputPath} ${af_InputPath} ${msk_InputPath} ${OutputPath}
 ###	/Volumes/CatWISE1/jwf/ARTID/do-ab.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${mdexInputPath} ${af_InputPath} ${msk_InputPath} ${OutputPath}
 	set saved_status = $? 
 	#check exit status
