@@ -6,12 +6,13 @@ echo
 echo Wrapper Started at:
 echo $startTime
 echo
-echo Version 1.2 
+echo Version 1.3 
 echo
 echo This Wrapper will wrap around and run:
 echo 1\) do-add-ab_flags
-#TODO extensive testing 
+#TODO: Extensive Testing 
 #6 tiles to test
+#TODO: Fix mode to to parse out the input path per each tile
 
 #check hyphenated argument
 @ i = 0
@@ -26,15 +27,15 @@ while ($i < $# + 1)
 end
 
 #check mode and input arguments 
-if ($# != 5) then
+if ($# != 7) then
         #Error handling
         #Too many or too little arguments       
         echo ""
         echo "ERROR: not enough arguments:"
         echo Mode 2 call:
-        echo AddABWrapper.tcsh 2 inputList.txt \<versionID\> \<InputPath\> \<OutputPath\>
+        echo ./addABWrapper.tcsh 2 inputList.txt \<versionID\> \<mdexInputPath\> \<af_InputPath\> \<msk_InputPath\> \<OutputPath\>
         echo Mode 3 call:
-        echo AddABWrapper.tcsh 3 TileName \<versionID\> \<InputPath\> \<OutputPath\>
+        echo ./addABWrapper.tcsh 3 TileName \<versionID\> \<mdexInputPath\> \<af_InputPath\> \<msk_InputPath\> \<OutputPath\>
         echo
         echo Exiting...
         exit
@@ -45,13 +46,19 @@ if ($# != 5) then
 else if ($1 == 2) then
 	set InputsList = $2
 	set versionID = $3
-        set InputPath = $4
-        set OutputPath = $5
+        set mdexInputPath = $4
+        set af_InputPath = $5
+        set msk_InputPath = $6
+        set OutputPath = $7
+
         echo Inputs list ==  $InputsList
 	echo versionID == $versionID
-        echo Input Path == $InputPath
+        echo Mdex Input Path == $mdexInputPath
+        echo af Input Path == $af_InputPath
+        echo msk Input Path == $msk_InputPath
         echo Output Path == $OutputPath
         echo
+
         #if directories dont exist, throw error
         if(! -f $InputsList) then
                 echo ERROR: Input List file $InputsList does not exist.
@@ -59,8 +66,20 @@ else if ($1 == 2) then
                 echo Exiting...
                 exit
         endif
-        if(! -d $InputPath) then
-                echo ERROR: Input Path directory $InputPath does not exist.
+        if(! -d $mdexInputPath) then
+                echo ERROR: Input Path directory $mdexInputPath does not exist.
+                echo
+                echo Exiting...
+                exit
+        endif
+        if(! -d $af_InputPath) then
+                echo ERROR: Input Path directory $af_InputPath does not exist.
+                echo
+                echo Exiting...
+                exit
+        endif
+        if(! -d $msk_InputPath) then
+                echo ERROR: Input Path directory $msk_InputPath does not exist.
                 echo
                 echo Exiting...
                 exit
@@ -80,11 +99,18 @@ else if ($1 == 2) then
 else if ($1 == 3) then
         set InputTable = $2
 	set versionID = $3
-        set InputPath = $4
-        set OutputPath = $5
+        set mdexInputPath = $4
+        set af_InputPath = $5
+        set msk_InputPath = $6
+        set OutputPath = $7
+
         echo Input Table == $InputTable
-        echo Input Path == $InputPath
+        echo versionID == $versionID
+        echo Mdex Input Path == $mdexInputPath
+        echo af Input Path == $af_InputPath
+        echo msk Input Path == $msk_InputPath
         echo Output Path == $OutputPath
+
         #if directories dont exist, throw error
         if(! -f $InputTable) then
 		echo
@@ -93,8 +119,20 @@ else if ($1 == 3) then
                 echo Exiting...
                 exit
         endif
-        if(! -d $InputPath) then
-                echo ERROR: Input Path directory $InputPath does not exist.
+        if(! -d $mdexInputPath) then
+                echo ERROR: Input Path directory $mdexInputPath does not exist.
+                echo
+                echo Exiting...
+                exit
+        endif
+        if(! -d $af_InputPath) then
+                echo ERROR: Input Path directory $af_InputPath does not exist.
+                echo
+                echo Exiting...
+                exit
+        endif
+        if(! -d $msk_InputPath) then
+                echo ERROR: Input Path directory $msk_InputPath does not exist.
                 echo
                 echo Exiting...
                 exit
@@ -116,9 +154,9 @@ else
 	echo
         echo ERROR mode 2, or 3 not selected
         echo Mode 2 call:
-        echo AddABWrapper.tcsh 2 inputList.txt \<InputPath\> \<OutputPath\>
+        echo ./addABWrapper.tcsh 2 inputList.txt \<versionID\> \<mdexInputPath\> \<af_InputPath\> \<msk_InputPath\> \<OutputPath\>
         echo Mode 3 call:
-        echo AddABWrapper.tcsh 3 TileName \<InputPath\> \<OutputPath\>
+        echo ./addABWrapper.tcsh 3 TileName \<versionID\> \<mdexInputPath\> \<af_InputPath\> \<msk_InputPath\> \<OutputPath\>
 	echo
         echo Exiting...
 	exit
@@ -134,13 +172,13 @@ Mode2:
         set mdexTable = `echo $table`
 
         echo "Current input MDEXTable == "$mdexTable
-        echo Calling AddABWrapper.tcsh Mode3 on ${table}\: 
+        echo Calling addABWrapper.tcsh Mode3 on ${table}\: 
 	if($rsyncSet == "true") then
-		echo "/Volumes/CatWISE1/ejmarchese/Dev/AddABWrapper/AddABWrapper.tcsh 3 $table $versionID $InputPath $OutputPath -rsync"
-		(echo y | /Volumes/CatWISE1/ejmarchese/Dev/AddABWrapper/AddABWrapper.tcsh 3 $table $versionID $InputPath $OutputPath -rsync) &
+		echo "/Volumes/CatWISE1/ejmarchese/Dev/AddABWrapper/addABWrapper.tcsh 3 $table $versionID $mdexInputPath $af_InputPath $msk_InputPath $OutputPath -rsync"
+		(echo y | /Volumes/CatWISE1/ejmarchese/Dev/AddABWrapper/addABWrapper.tcsh 3 $table $versionID $mdexInputPath $af_InputPath $msk_InputPath $OutputPath -rsync) &
 	else
-		echo "/Volumes/CatWISE1/ejmarchese/Dev/AddABWrapper/AddABWrapper.tcsh 3 $table $versionID $InputPath $OutputPath"
-		(echo y | /Volumes/CatWISE1/ejmarchese/Dev/AddABWrapper/AddABWrapper.tcsh 3 $table $versionID $InputPath $OutputPath) &
+		echo "/Volumes/CatWISE1/ejmarchese/Dev/AddABWrapper/addABWrapper.tcsh 3 $table $versionID $mdexInputPath $af_InputPath $msk_InputPath $OutputPath"
+		(echo y | /Volumes/CatWISE1/ejmarchese/Dev/AddABWrapper/addABWrapper.tcsh 3 $table $versionID $mdexInputPath $af_InputPath $msk_InputPath $OutputPath) &
 	endif
 	
 	set maxInParallel = 12
@@ -183,23 +221,32 @@ Mode3:
         set edit_mdexTablePATH = `dirname $mdexTable`
 	set edited_mdexTablePATH = `cd $edit_mdexTablePATH && pwd`
 	set RadecID = `echo $edited_mdexTable | awk '{print substr($0,0,8)}'`
-	@ tempIndex = ($tempIndex - 8 - 3)
        ### tempIndex = tempIndex - sizeof($RadecID) - sizeof("_af")
+	@ tempIndex = ($tempIndex - 8 - 3)
+	#@ tempIndex = ($tempIndex - 8 )
 	set RestOfTablename = `basename $mdexTable | awk -v endIndex=$tempIndex '{print substr($0,9,endIndex)}'` 
 
+	set originalTable = ${edited_mdexTablePATH}/${RadecID}${RestOfTablename}.tbl
 	echo "__________________________________________________________________________________________________"
         echo "Current input MDEXTable == "$mdexTable
         echo "Edited_Current input MDEXTable == "${edited_mdexTablePATH}//${edited_mdexTable}.tbl
         echo "RadecID == "$RadecID
 	echo "RestOfTablename == "$RestOfTablename
 	echo "versionID == "${versionID}
-	echo "InputPath == "${InputPath}
+	echo "mdexInputPath == "${mdexInputPath}
+	echo "af_InputPath == "${af_InputPath}
+	echo "msk_InputPath == "${msk_InputPath}
 	echo "OutputPath  == "${OutputPath}
+	echo "originalTable == ${originalTable}"
 	echo "__________________________________________________________________________________________________"
 	echo 
 	
 	echo Unzipping $mdexTable to ${edited_mdexTablePATH}/${edited_mdexTable}.tbl
 	gunzip -f -c -k $mdexTable > ${edited_mdexTablePATH}/${edited_mdexTable}.tbl 
+
+	echo Unzipping ${originalTable}.gz to ${originalTable}
+	gunzip -f -c -k ${originalTable}.gz > ${originalTable}
+
 	set saved_status = $? #Error Checking
        ### check exit status
         echo gunzip saved_status == ${saved_status}
@@ -216,13 +263,13 @@ Mode3:
 	#TODO add version 
 ###	#/Users/CatWISE/do-add-ab_flags.tcsh ${RadecID} ${RestOfTablename} v0 
 ###	#/Users/CatWISE/do-add-ab_flags.tcsh 1497p015 _opt1_20180609_083107 v0 
-###     echo "/Users/CatWISE/do-add-ab_flags.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${InputPath} ${OutputPath}" 
+###     echo "/Users/CatWISE/do-add-ab_flags.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${mdexInputPath} ${af_InputPath} ${msk_InputPath} ${OutputPath}" 
 	echo John Fowler Program call:
-###      #echo "/Volumes/CatWISE1/ejmarchese/Dev/AddABWrapper/do-ab.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${InputPath} ${OutputPath}" 
-        echo "/Volumes/CatWISE1/jwf/ARTID/do-ab.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${InputPath} ${OutputPath}" 
+      echo "/Volumes/CatWISE1/ejmarchese/Dev/AddABWrapper/do-ab.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${mdexInputPath} ${af_InputPath} ${msk_InputPath} ${OutputPath}" 
+###        echo "/Volumes/CatWISE1/jwf/ARTID/do-ab.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${mdexInputPath} ${af_InputPath} ${msk_InputPath} ${OutputPath}" 
 	echo
-###	#/Volumes/CatWISE1/ejmarchese/Dev/AddABWrapper/do-ab.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${InputPath} ${OutputPath}
-	/Volumes/CatWISE1/jwf/ARTID/do-ab.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${InputPath} ${OutputPath}
+	/Volumes/CatWISE1/ejmarchese/Dev/AddABWrapper/do-ab.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${mdexInputPath} ${af_InputPath} ${msk_InputPath} ${OutputPath}
+###	/Volumes/CatWISE1/jwf/ARTID/do-ab.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${mdexInputPath} ${af_InputPath} ${msk_InputPath} ${OutputPath}
 	set saved_status = $? 
 	#check exit status
 	echo stils saved_status == $saved_status 
@@ -248,6 +295,15 @@ exit
 Mode3_Done:
 echo AddABWrapper on ${RadecID} Mode: ${1} Done
 set endTime = `date '+%m/%d/%Y %H:%M:%S'`
+echo "rm  ${edited_mdexTablePATH}/${edited_mdexTable}.tbl"
+echo "rm  ${originalTable}"
+rm  ${edited_mdexTablePATH}/${edited_mdexTable}.tbl
+rm  ${originalTable}
+#TODO:
+# change arguments to 3 input directories:
+# ab_masks, af, mdex tables,
+# these 3 types of tiles in different dirrectories
+# ab, af, mdex
 echo
 	######TODO: reduce redundencies in code
 	#echo NOT!!!Gzipping and rm ${edited_mdexTablePATH}/${edited_mdexTable}_af.tbl
