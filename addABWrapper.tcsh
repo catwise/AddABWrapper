@@ -183,9 +183,9 @@ Mode2:
 	endif
 	
 	set maxInParallel = 12
-        if(`ps -ef | grep AddABWrapper | wc -l` > $maxInParallel + 1) then
-                echo  More than $maxInParallel AddABWrapper processes, waiting...
-                while(`ps -ef | grep AddABWrapper | wc -l` > $maxInParallel + 1)
+        if(`ps -ef | grep addABWrapper | wc -l` > $maxInParallel + 1) then
+                echo  More than $maxInParallel addABWrapper processes, waiting...
+                while(`ps -ef | grep addABWrapper | wc -l` > $maxInParallel + 1)
                         sleep 1
                         #echo IM WATING
                         #do nothing
@@ -193,7 +193,7 @@ Mode2:
                 echo  Done waiting
         endif
 		echo
-                echo AddABWrapper for $table  done
+                echo addABWrapper for $table  done
             
             echo ====================================== - END AddABWrapper wrapper loop iteration - =======================================
     end
