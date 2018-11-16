@@ -8,3 +8,6 @@
 
 TODO:
 Write README
+
+NOTES:
+* The reason we have both \<mdexInputPath\> \<af_InputPath\> is because we need 1) the flags in the "af-table" and 2) the precision in the original "mdex-tables" that is lost in the "af-tables" from stilts.
