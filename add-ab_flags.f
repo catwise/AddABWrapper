@@ -26,6 +26,7 @@ c     1.93 B81103: addedmany debug checkpoints to trace NaNs
 c     1.94 B81105: removed NaN debugging and band0aid NaN fix
 c     1.95 B81106: added "pipe" table header conversion to "double" for
 c                  ra, dec, MJDs, elon, & elat
+c     1.96 B81120: installed mag upper limit logic
 c
 c=======================================================================
 c
@@ -45,7 +46,7 @@ c
       Character*5    nAWstr
       Character*3    Flag, Flag0
       Real *8        ra, dec, x8, y8, flux, sigflux, mag, sigmag,
-     +               w1m0, w2m0, CoefMag
+     +               w1m0, w2m0, CoefMag, wsnr
       Real*4         w1x, w2x, w1y, w2y, dist, dist2
       Integer*4      IArgC, LNBlnk, FileID1, nHead, MskBitHist(32), msk,
      +               NPlanes, NRows, NCols, I, J, N, IStat, NpixPL, k,
@@ -60,7 +61,7 @@ c
       Integer*4      nullval
       Integer*4, allocatable :: array1(:,:)
 c
-      Data Vsn/'1.95 B81106'/, nSrc/0/, nHead/0/, SanityChk/.true./,
+      Data Vsn/'1.96 B81120'/, nSrc/0/, nHead/0/, SanityChk/.true./,
      +     doMags/.true./, useWCS/.true./, NaNwarn/.false./,
      +     nn11,nn12,nn21,nn22/4*0/, w1m0,w2m0/2*22.5/,
      +     NeedHelp/.False./, MskBitHist/32*0/, dbg/.false./,
@@ -544,15 +545,22 @@ c
           nMag = 1
           read (Line(Ifa(22):Ifb(22)), *, err=333) flux
           read (Line(Ifa(23):Ifb(23)), *, err=333) sigflux
-          if (flux .gt. 0.0d0) then
+          wsnr = flux/sigflux
+          if (wsnr .gt. 9999.0) wsnr = 9999.0
+          write (Line(IFA(20):IFB(20)), '(F7.1)') wsnr
+          if ((flux .gt. 0.0d0) .and. (wsnr .ge. 2.0d0)) then
             mag    = w1m0 - 2.5*dlog10(flux)
             sigmag = CoefMag*sigflux/flux
             write (Line(Ifa(26):Ifb(26)),'(f7.3)') mag
             write (Line(Ifa(27):Ifb(27)),'(f10.3)') sigmag
           else
-            mag = w1m0 - 2.5*dlog10(2.0d0*sigflux)
+            if (flux .gt. 0.0d0) then
+              mag = w1m0 - 2.5*dlog10(flux+2.0d0*sigflux)
+            else
+              mag = w1m0 - 2.5*dlog10(2.0d0*sigflux)
+            end if
             write (Line(Ifa(26):Ifb(26)),'(f7.3)') mag
-            Line(Ifa(27):Ifb(27)) = '      null'
+            Line(Ifa(27):Ifb(27)) = '      9.99'
           end if
           if (index(Line(IFa(26):IFb(26)),'NaN') .ne. 0) then
             print *, 'ERROR: NaN produced for w1mpro on row no.', nSrc
@@ -566,15 +574,22 @@ c
           nMag = 2
           read (Line(Ifa(24):Ifb(24)), *, err=333) flux
           read (Line(Ifa(25):Ifb(25)), *, err=333) sigflux
-          if (flux .gt. 0.0d0) then
-            mag    = w1m0 - 2.5*dlog10(flux)
+          wsnr = flux/sigflux
+          if (wsnr .gt. 9999.0) wsnr = 9999.0
+          write (Line(IFA(21):IFB(21)), '(F7.1)') wsnr
+          if ((flux .gt. 0.0d0) .and. (wsnr .ge. 2.0d0)) then
+            mag    = w2m0 - 2.5*dlog10(flux)
             sigmag = CoefMag*sigflux/flux
             write (Line(Ifa(29):Ifb(29)),'(f7.3)') mag
             write (Line(Ifa(30):Ifb(30)),'(f10.3)') sigmag
           else
-            mag = w1m0 - 2.5*dlog10(2.0d0*sigflux)
+            if (flux .gt. 0.0d0) then
+              mag = w2m0 - 2.5*dlog10(flux+2.0d0*sigflux)
+            else
+              mag = w2m0 - 2.5*dlog10(2.0d0*sigflux)
+            end if
             write (Line(Ifa(29):Ifb(29)),'(f7.3)') mag
-            Line(Ifa(30):Ifb(30)) = '      null'
+            Line(Ifa(30):Ifb(30)) = '      9.99'
           end if
           if (index(Line(IFa(29):IFb(29)),'NaN') .ne. 0) then
             print *, 'ERROR: NaN produced for w2mpro on row no.', nSrc
@@ -588,15 +603,22 @@ c
           nMag = 3
           read (Line(Ifa(152):Ifb(152)), *, err=333) flux
           read (Line(Ifa(153):Ifb(153)), *, err=333) sigflux
-          if (flux .gt. 0.0d0) then
+          wsnr = flux/sigflux
+          if (wsnr .gt. 9999.0) wsnr = 9999.0
+          write (Line(IFA(150):IFB(150)), '(f9.1)') wsnr
+          if ((flux .gt. 0.0d0) .and. (wsnr .ge. 2.0d0)) then
             mag    = w1m0 - 2.5*dlog10(flux)
             sigmag = CoefMag*sigflux/flux
             write (Line(Ifa(156):Ifb(156)),'(f10.3)') mag
             write (Line(Ifa(157):Ifb(157)),'(f13.3)') sigmag
           else
-            mag = w1m0 - 2.5*dlog10(2.0d0*sigflux)
+            if (flux .gt. 0.0d0) then
+              mag = w1m0 - 2.5*dlog10(flux+2.0d0*sigflux)
+            else
+              mag = w1m0 - 2.5*dlog10(2.0d0*sigflux)
+            end if
             write (Line(Ifa(156):Ifb(156)),'(f10.3)') mag
-            Line(Ifa(157):Ifb(157)) = '         null'
+            Line(Ifa(157):Ifb(157)) = '         9.99'
           end if
           if (index(Line(IFa(156):IFb(156)),'NaN') .ne. 0) then
             print *,'ERROR: NaN produced for w1mpro_pm on row no.', nSrc
@@ -610,15 +632,22 @@ c
           nMag = 4
           read (Line(Ifa(154):Ifb(154)), *, err=333) flux
           read (Line(Ifa(155):Ifb(155)), *, err=333) sigflux
-          if (flux .gt. 0.0d0) then
-            mag    = w1m0 - 2.5*dlog10(flux)
+          wsnr = flux/sigflux
+          if (wsnr .gt. 9999.0) wsnr = 9999.0
+          write (Line(IFA(151):IFB(151)), '(F9.1)') wsnr
+          if ((flux .gt. 0.0d0) .and. (wsnr .ge. 2.0d0)) then
+            mag    = w2m0 - 2.5*dlog10(flux)
             sigmag = CoefMag*sigflux/flux
             write (Line(Ifa(159):Ifb(159)),'(f10.3)') mag
             write (Line(Ifa(160):Ifb(160)),'(f13.3)') sigmag
           else
-            mag = w1m0 - 2.5*dlog10(2.0d0*sigflux)
+            if (flux .gt. 0.0d0) then
+              mag = w2m0 - 2.5*dlog10(flux+2.0d0*sigflux)
+            else
+              mag = w2m0 - 2.5*dlog10(2.0d0*sigflux)
+            end if
             write (Line(Ifa(159):Ifb(159)),'(f10.3)') mag
-            Line(Ifa(160):Ifb(160)) = '         null'
+            Line(Ifa(160):Ifb(160)) = '         9.99'
           end if
           if (index(Line(IFa(159):IFb(159)),'NaN') .ne. 0) then
             print *,'ERROR: NaN produced for w2mpro_pm on row no.', nSrc
