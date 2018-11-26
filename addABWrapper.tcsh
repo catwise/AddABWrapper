@@ -6,7 +6,7 @@ echo
 echo Wrapper Started at:
 echo $startTime
 echo
-echo Version 1.4 
+echo Version 1.5 
 echo
 echo This Wrapper will wrap around and run:
 echo 1\) do-add-ab_flags
@@ -184,7 +184,7 @@ Mode2:
 	
 	set maxInParallel = 12
         if(`ps -ef | grep addABWrapper | wc -l` > $maxInParallel + 1) then
-                echo  More than $maxInParallel addABWrapper processes, waiting...
+                echo  More than $maxInParallel AddABWrapper processes, waiting...
                 while(`ps -ef | grep addABWrapper | wc -l` > $maxInParallel + 1)
                         sleep 1
                         #echo IM WATING
@@ -193,7 +193,7 @@ Mode2:
                 echo  Done waiting
         endif
 		echo
-                echo addABWrapper for $table  done
+                echo AddABWrapper for $table  done
             
             echo ====================================== - END AddABWrapper wrapper loop iteration - =======================================
     end
@@ -227,6 +227,7 @@ Mode3:
 	#@ tempIndex = ($tempIndex - 8 )
 	set RestOfTablename = `basename $mdexTable | awk -v endIndex=$tempIndex '{print substr($0,9,endIndex)}'` 
 
+
 	set originalTable = ${edited_mdexTablePATH}/${RadecID}${RestOfTablename}.tbl
 	echo "__________________________________________________________________________________________________"
         echo "Current input afTable == "$mdexTable
@@ -239,8 +240,7 @@ Mode3:
 	echo "msk_InputPath == "${msk_InputPath}
 	echo "OutputPath  == "${OutputPath}
 	echo "originalTable == ${originalTable}"
-	echo "__________________________________________________________________________________________________"
-	echo 
+	echo "__________________________________________________________________________________________________\n"
 	
 	echo Unzipping $mdexTable to ${edited_mdexTablePATH}/${edited_mdexTable}.tbl
 	gunzip -f -c -k $mdexTable > ${edited_mdexTablePATH}/${edited_mdexTable}.tbl 
@@ -262,15 +262,9 @@ Mode3:
        ###Program call
 	#appending v0,  _ab_v0
 	#TODO add version 
-###	#/Users/CatWISE/do-add-ab_flags.tcsh ${RadecID} ${RestOfTablename} v0 
-###	#/Users/CatWISE/do-add-ab_flags.tcsh 1497p015 _opt1_20180609_083107 v0 
-###     echo "/Users/CatWISE/do-add-ab_flags.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${mdexInputPath} ${af_InputPath} ${msk_InputPath} ${OutputPath}" 
 	echo John Fowler Program call:
-      echo "${wrapperDir}/do-ab.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${mdexInputPath} ${af_InputPath} ${msk_InputPath} ${OutputPath}" 
-###        echo "/Volumes/CatWISE1/jwf/ARTID/do-ab.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${mdexInputPath} ${af_InputPath} ${msk_InputPath} ${OutputPath}" 
-	echo
-	${wrapperDir}/do-ab.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${mdexInputPath} ${af_InputPath} ${msk_InputPath} ${OutputPath}
-###	/Volumes/CatWISE1/jwf/ARTID/do-ab.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${mdexInputPath} ${af_InputPath} ${msk_InputPath} ${OutputPath}
+      	echo "${wrapperDir}/do-ab.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${mdexInputPath} ${af_InputPath} ${msk_InputPath} ${OutputPath} \n" 
+	${wrapperDir}/do-ab.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${mdexInputPath} ${af_InputPath} ${msk_InputPath} ${OutputPath} 
 	set saved_status = $? 
 	#check exit status
 	echo stils saved_status == $saved_status 
@@ -281,7 +275,6 @@ Mode3:
 	endif
 	echo
 
-	#echo DONE. Output: ${edited_mdexTablePATH}/${edited_mdexTable}_af.tbl 
 	goto Mode3_Done #gzip_done
 
 Done:
@@ -294,6 +287,7 @@ exit
 
 #Done section for gzipping rsyncing
 Mode3_Done:
+echo DONE. Output: ${edited_mdexTablePATH}/${edited_mdexTable}_af.tbl 
 echo AddABWrapper on ${RadecID} Mode: ${1} Done
 set endTime = `date '+%m/%d/%Y %H:%M:%S'`
 echo "rm  ${edited_mdexTablePATH}/${edited_mdexTable}.tbl"
