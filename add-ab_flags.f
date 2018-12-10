@@ -27,6 +27,9 @@ c     1.94 B81105: removed NaN debugging and band0aid NaN fix
 c     1.95 B81106: added "pipe" table header conversion to "double" for
 c                  ra, dec, MJDs, elon, & elat
 c     1.96 B81120: installed mag upper limit logic
+c     1.97 B81207: restored 4-band cc_flags; added w?sat processing and
+c                  w?mcor values
+c     1.98 B81210: installed w?sat & w?cov processing
 c
 c=======================================================================
 c
@@ -35,9 +38,9 @@ c
 c
       character*150000 Hfits
       Character*5000 Line, HdrLine
-      Character*500  InFNam, MskNam, OutFNam, NLNam, w1cc_map_str,
-     +               w2cc_map_str, cc_flags, w1cc_map, w2cc_map,
-     +               dist_str
+      Character*500  InFNam, MskNam, OutFNam, NLNam, Cov1Nam, Cov2Nam
+      Character*50   w1cc_map_str, w2cc_map_str, cc_flags, w1cc_map,
+     +               w2cc_map, dist_str
       Character*25   Field(MaxFld)
       Character*13   w1ab_map_str, w2ab_map_str
       Character*11   Vsn, NumStr
@@ -45,37 +48,46 @@ c
       Character*8    CDate, CTime
       Character*5    nAWstr
       Character*3    Flag, Flag0
+      Character*1    w3cc, w4cc, w3cc2, w4cc2
       Real *8        ra, dec, x8, y8, flux, sigflux, mag, sigmag,
      +               w1m0, w2m0, CoefMag, wsnr
-      Real*4         w1x, w2x, w1y, w2y, dist, dist2
+      Real*4         w1x, w2x, w1y, w2y, dist, dist2, w1mcor, w2mcor,
+     +               wsat, wcov
       Integer*4      IArgC, LNBlnk, FileID1, nHead, MskBitHist(32), msk,
      +               NPlanes, NRows, NCols, I, J, N, IStat, NpixPL, k,
      +               NPix, status, nSrc, IFa(MaxFld), IFb(MaxFld), NF,
      +               w1abmap, w2abmap, w1ccmap, w2ccmap, notZero, nMag,
      +               nSrcHdr, nAW, w1ccmap2, w2ccmap2, IOr, nArg, nArgs,
      +               nw394, nw395, nw396, nw397, nw398, nw385, wcs,
-     +               offscl, nNaN, nn11, nn12, nn21, nn22
+     +               offscl, nNaN, nn11, nn12, nn21, nn22, kBadw3,
+     +               kBadw4, kBad2w3, kBad2w4, kBadness, i1PSF, j1PSF,
+     +               iPix, jPix, nPSF, i2PSF, j2PSF, n1Sat, n2Sat,
+     +               n1Cov, n2Cov
       Logical*4      NeedHelp, anynull, SanityChk, GoodXY1, GoodXY2,
      +               BitSet, dbg, OKhdr, useWCS, NaNwarn, NaNstat1,
-     +               NaNpm1, NaNstat2, NaNpm2, doMags
+     +               NaNpm1, NaNstat2, NaNpm2, doMags, doCov, GotN1,
+     +               GotN2
       Integer*4      nullval
       Integer*4, allocatable :: array1(:,:)
+      Integer*2      cov1(2048,2048), cov2(2048,2048)
 c
-      Data Vsn/'1.96 B81120'/, nSrc/0/, nHead/0/, SanityChk/.true./,
+      Data Vsn/'1.98 B81210'/, nSrc/0/, nHead/0/, SanityChk/.true./,
      +     doMags/.true./, useWCS/.true./, NaNwarn/.false./,
-     +     nn11,nn12,nn21,nn22/4*0/, w1m0,w2m0/2*22.5/,
+     +     nn11,nn12,nn21,nn22/4*0/, w1m0,w2m0/2*22.5/, nPSF/2/,
      +     NeedHelp/.False./, MskBitHist/32*0/, dbg/.false./,
-     +     notZero/0/, CoefMag/1.085736205d0/
+     +     notZero/0/, CoefMag/1.085736205d0/, w1mcor/0.145/,
+     +     w2mcor/0.177/, kBadw3,kBadw4,kBad2w3,kBad2w4/4*0/,
+     +     doCov/.true./, GotN1,GotN2/2*.false./
 c
       Common / VDT / CDate, CTime, Vsn
 c
-      namelist / abflagin / doMags, w1m0, w2m0
+      namelist / abflagin / doCov, doMags, nPSF, w1m0, w1mcor,
+     +                      w2m0, w2mcor
 c
 c=======================================================================
 c
       nArgs = IArgc()
-      NeedHelp = (nArgs .lt. 6) .or. (nArgs .gt. 9)
-c
+      NeedHelp = (nArgs .lt. 6)
 1     If (NeedHelp) then
         print *,'add-ab_flags vsn ', Vsn
         print *
@@ -92,8 +104,13 @@ c
         print *,'        appended; this file must not already exist'
         print *
         print *,'The OPTIONAL flags are:'
+        print *,'    -n1 name of a W1 "-n-" coverage image'
+        print *,'    -n2 name of a W2 "-n-" coverage image'
         print *,'    -n  name of an abflagin namelist file'
         print *,'    -d  (enable debug mode)'
+        Print *
+        print *,
+     +  'If either "-n1" or "-n2" is specified, the other must also be.'
         stop
       end if
 c - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -133,6 +150,34 @@ c
           NeedHelp = .True.
           Go to 1
         end if
+c
+      else if (Flag .eq. '-N1') then
+        call NextNarg(NArg,Nargs)
+        Call GetArg(NArg,Cov1Nam)
+        if (Index(Cov1Nam,'.fits') .eq. 0)
+     +    Cov1Nam = Cov1Nam(1:LNBlnk(Cov1Nam))//'.fits'
+        if (Access(Cov1Nam(1:LNBlnk(Cov1Nam)),' ') .ne. 0) then
+          print *
+          print *,'ERROR: File not found: ', Cov1Nam(1:LNBlnk(Cov1Nam))
+          print *
+          NeedHelp = .True.
+          Go to 1
+        end if
+        GotN1 = .true.
+c
+      else if (Flag .eq. '-N2') then
+        call NextNarg(NArg,Nargs)
+        Call GetArg(NArg,Cov2Nam)
+        if (Index(Cov2Nam,'.fits') .eq. 0)
+     +    Cov2Nam = Cov2Nam(1:LNBlnk(Cov2Nam))//'.fits'
+        if (Access(Cov2Nam(1:LNBlnk(Cov2Nam)),' ') .ne. 0) then
+          print *
+          print *,'ERROR: File not found: ', Cov2Nam(1:LNBlnk(Cov2Nam))
+          print *
+          NeedHelp = .True.
+          Go to 1
+        end if
+        GotN2 = .true.
       else if (Flag .eq. '-O') then
         call NextNarg(NArg,Nargs)
         Call GetArg(NArg,OutFNam)
@@ -166,9 +211,17 @@ c
       end if
 c 
       If (NArg .lt. NArgs) Go to 2
+      DoCov = DoCov .and. GotN1 .and. GotN2
+      if ((GotN1 .or. GotN2) .and. .not.DoCov) then
+        print *,
+     +   'WARNING: "-n1" and/or "-n2" specified, but either DoCov = F'
+        print *,
+     +   'in namelist or only one coverage image specified;'
+        print *,'coverage image(s) ignored.'
+      end if
 c
 c - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-c
+c                                      ! open the mask file and read in
       call readFhead(MskNam,Hfits)
       Call GetNAX(MskNam,NCols,NRows,NPlanes,1,FileID1)
       if (dbg) print *,'GetNAX returned NCols,NRows,NPlanes,FileID1:',
@@ -218,6 +271,52 @@ C  Any unit numbers allocated with FTGIOU must be freed with FTFIOU.
         print *,'No. of nonzero mask pixels: ',notZero,
      +          '; fraction = ',float(notZero)/16793604.0
       end if
+c
+c - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+c                                      ! read in the W1 coverage file
+      call readFhead(Cov1Nam,Hfits)
+      Call GetNAX(Cov1Nam,NCols,NRows,NPlanes,1,FileID1)
+      if (dbg) print *,
+     +        'Cov1 - GetNAX returned NCols,NRows,NPlanes,FileID1:',
+     +         NCols,NRows,NPlanes,FileID1 ! dbg
+      if (NPlanes .ne. 1) then
+         print *,'ERROR: this program handles only 2-dimensional images'
+         stop
+      end if 
+c
+      NPix = NCols*NRows
+      status = 0
+      call ftgpvi(FileID1,1,1,NPix,nullval,Cov1,anynull,status)
+      if (status .ne. 0) then
+        print *,'ERROR reading Cov1; status = ',status
+        stop
+      end if
+      status = 0
+      call ftclos(FileID1, status)
+      call ftfiou(FileID1, status)
+c
+c - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+c                                      ! read in the W2 coverage file
+      call readFhead(Cov2Nam,Hfits)
+      Call GetNAX(Cov2Nam,NCols,NRows,NPlanes,1,FileID1)
+      if (dbg) print *,
+     +        'Cov2 - GetNAX returned NCols,NRows,NPlanes,FileID1:',
+     +         NCols,NRows,NPlanes,FileID1 ! dbg
+      if (NPlanes .ne. 1) then
+         print *,'ERROR: this program handles only 2-dimensional images'
+         stop
+      end if 
+c
+      NPix = NCols*NRows
+      status = 0
+      call ftgpvi(FileID1,1,1,NPix,nullval,Cov2,anynull,status)
+      if (status .ne. 0) then
+        print *,'ERROR reading Cov2; status = ',status
+        stop
+      end if
+      status = 0
+      call ftclos(FileID1, status)
+      call ftfiou(FileID1, status)
 c
 c - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 c                                      ! Sanity Check
@@ -342,10 +441,6 @@ c                                      ! check for multi-matches
         else                                                   ! solo match
           nAWstr = '    1'
         end if
-        if (index(Line(IFa(394):Ifb(394)),'null') .eq. 0) then
-          n = IFa(394) + lnblnk(Line(IFa(394):Ifb(394))) - 2   ! chop off W3
-          Line(n:n+1) = '  '                                   ! & W4 cc_flags
-        end if
         dist_str     = AdjustL(Line(IFa(385):IFb(385)))
         cc_flags     = AdjustL(Line(Ifa(394):IFb(394)))
         w1cc_map     = AdjustL(Line(Ifa(395):IFb(395)))
@@ -371,10 +466,16 @@ c                                      ! check for multi-matches
       end if
 c                                 ! process multi-matches
       read (Line(IFa(401):IFb(401)), *, err = 3003) nAW
-      write (nAWstr,'(i5)') nAW        ! note that w1cc_map and w2cc_map
-      read (Line(IFa(395):Ifb(395)), *, err = 3004) w1ccmap ! should never
-      read (Line(IFa(397):Ifb(397)), *, err = 3005) w2ccmap ! be null for
-      read (Line(IFa(385):Ifb(385)), *, err = 3006) dist    ! matched srcs
+      write (nAWstr,'(i5)') nAW         ! note that w1cc_map and w2cc_map
+      read (Line(IFa(395):Ifb(395)), *, err = 3004) w1ccmap  ! should never
+      read (Line(IFa(397):Ifb(397)), *, err = 3005) w2ccmap  ! be null for
+      read (Line(IFa(385):Ifb(385)), *, err = 3006) dist     ! matched srcs.
+      n = IFa(394) + lnblnk(Line(IFa(394):Ifb(394))) - 2     ! monitor W3
+      w3cc = Line(n:n)                                       ! & W4 cc_flags
+      w4cc = Line(n+1:n+1)
+      kBadw3 = kBadness(w3cc)
+      kBadw4 = kBadness(w4cc)
+c
       do 20 n = 2, nAW
         nSrc = nSrc + 1                ! increment for error msg only
         read (10, '(a)', end=3006) Line
@@ -384,6 +485,21 @@ c                                 ! process multi-matches
         w2ccmap = IOr(w2ccmap, w2ccmap2)
         read (Line(IFa(385):Ifb(385)), *, err = 3006) dist2
         if (dist2 .gt. dist) dist = dist2
+        kBad2w3 = 0
+        kBad2w4 = 0
+        k = IFa(394) + lnblnk(Line(IFa(394):Ifb(394))) - 2   ! monitor W3
+        w3cc2 = Line(k:k)                                    ! & W4 cc_flags
+        w4cc2 = Line(k+1:k+1)
+        kBad2w3 = kBadness(w3cc2)
+        kBad2w4 = kBadness(w4cc2)
+        if (kBad2w3 .gt. kBadw3) then
+          w3cc   = w3cc2
+          kBadw3 = kBad2w3
+        end if
+        if (kBad2w4 .gt. kBadw4) then
+          w4cc   = w4cc2
+          kBadw4 = kBad2w4
+        end if
 20    continue
       nSrc = nSrc - nAW + 1
       write (dist_str,'(f8.5)') dist
@@ -501,6 +617,7 @@ c
         if (dbg) print *,'w2cc_map_str: ',w2cc_map_str(1:lnblnk(w2cc_map_str))
       end if
 c
+      cc_flags = cc_flags(1:lnblnk(cc_flags))//w3cc//w4cc
       cc_flags(1:1)     = ' '          ! remove sentinel character
       w1cc_map_str(1:1) = ' '
       w2cc_map_str(1:1) = ' '
@@ -680,10 +797,10 @@ c                                      ! process CatWISE mask bits
 		  w1x = x8
 		  w1y = y8
 		endif
-c       i = NInt(w1x)                  ! don't round off; RA & Dec of
-c       j = NInt(w1y)                  ! a pixel are at its center
-        i = w1x
-        j = w1y
+c       iPix = NInt(w1x)               ! don't round off; RA & Dec of
+c       jPix = NInt(w1y)               ! a pixel are at its center
+        iPix = w1x
+        jPix = w1y
         write(Line(IFa(8):IFb(8)),  '(f9.3)') w1x
         write(Line(IFa(9):IFb(9)),  '(f9.3)') w1y
         write(Line(IFa(10):IFb(10)),'(f9.3)') w1x
@@ -704,15 +821,15 @@ c
         read (Line(IFa(k):IFb(k)), *, err = 3001) w1x
         k = 10
         read (Line(IFa(k):IFb(k)), *, err = 3001) w2x
-        i = (w1x+w2x)/2.0
+        iPix = (w1x+w2x)/2.0
       else if (GoodXY1) then
         k = 8
         read (Line(IFa(k):IFb(k)), *, err = 3001) w1x
-        i = w1x
+        iPix = w1x
       else if (GoodXY2) then
         k = 10
         read (Line(IFa(k):IFb(k)), *, err = 3001) w2x
-        i = w2x
+        iPix = w2x
       else
         ab_flags     = '     null'
         w1ab_map     = '     null'
@@ -729,15 +846,15 @@ c
         read (Line(IFa(k):IFb(k)), *, err = 3001) w1y
         k = 11
         read (Line(IFa(k):IFb(k)), *, err = 3001) w2y
-        j = (w1y+w2y)/2.0
+        jPix = (w1y+w2y)/2.0
       else if (GoodXY1) then
         k = 9
         read (Line(IFa(k):IFb(k)), *, err = 3001) w1y
-        j = w1y
+        jPix = w1y
       else if (GoodXY2) then
         k = 11
         read (Line(IFa(k):IFb(k)), *, err = 3001) w2y
-        j = w2y
+        jPix = w2y
       else
         ab_flags     = '     null'
         w1ab_map     = '     null'
@@ -747,7 +864,7 @@ c
         go to 900
       end if
 c
-500   msk = array1(i,j)
+500   msk = array1(iPix,jPix)
       if (dbg .and. (msk .gt. 0)) then
         if (.not.BitSet(msk,6) .and. .not.BitSet(msk,21) .and.
      +      .not.BitSet(msk,9) .and. .not.BitSet(msk,10) .and.
@@ -930,6 +1047,45 @@ c
         print *,Line(1:lnblnk(Line))
         go to 510        
       end if
+c                                      ! plug in canonical w1mcor & w2mcor
+      write(Line(IFa(44):IFb(44)),'(f7.3)') w1mcor
+      write(Line(IFa(49):IFb(49)),'(f7.3)') w2mcor
+c                                      ! compute w?cov and w?sat
+      i1PSF = iPix - nPSF
+      i2PSF = iPix + nPSF
+      j1PSF = jPix - nPSF
+      j2PSF = jPix + nPSF
+      if (i1PSF .lt. 1)    i1PSF = 1
+      if (i2PSF .gt. 2048) i2PSF = 2048
+      if (j1PSF .lt. 1)    j1PSF = 1
+      if (j2PSF .gt. 2048) j2PSF = 2048
+      nPix  = 0
+      n1Sat = 0
+      n2Sat = 0
+      n1Cov = 0
+      n2Cov = 0
+      do 610 j = j1PSF, j2PSF
+        do 600 i = i1PSF, i2PSF
+          nPix = nPix + 1
+          if (BitSet(array1(i,j),4)) n1Sat = n1Sat + 1
+          if (BitSet(array1(i,j),5)) n2Sat = n2Sat + 1
+          if (doCov) then
+            n1Cov = n1Cov + cov1(i,j)
+            n2Cov = n2Cov + cov2(i,j)      
+          end if
+600     continue
+610   continue
+      wsat = float(n1Sat)/float(nPix)
+      write(Line(IFA(37):IFb(37)),'(f8.5)') wsat
+      wsat = float(n2Sat)/float(nPix)
+      write(Line(IFA(38):IFb(38)),'(f8.5)') wsat
+      if (doCov) then
+        wcov = float(n1Cov)/float(nPix)
+        write(Line(IFA(43):IFb(43)),'(f8.2)') wcov
+        wcov = float(n2Cov)/float(nPix)
+        write(Line(IFA(48):IFb(48)),'(f8.2)') wcov
+      end if
+c
       write(20,'(a)') Line(1:lnblnk(line))
       go to 10
 c
@@ -1522,3 +1678,23 @@ c       Integer*4     I
 
          RETURN
          END
+c
+c=======================================================================
+c
+      function kBadness(ccflag)
+      
+      integer*4   kBadness, k
+      Character*1 ccflag, ccflags(9)
+      data ccflags/'D','P','H','O','d','p','h','o','0'/
+c
+      do 10 k = 1, 9
+        if (ccflag .eq. ccflags(k)) then
+          kBadness = 10 - k
+          return
+        end if
+10    continue
+c
+      kBadness = 0
+      return
+      end
+      
