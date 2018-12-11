@@ -1178,10 +1178,10 @@ c
       print *,'       dec field: "'//Line(IFa(4):IFb(4))//'"'
       call exit(64)
 c
-3017  print *,'ERROR: EoF encountered in ssoidin namelist file'
+3017  print *,'ERROR: EoF encountered in abflagin namelist file'
       call exit(64)
 c
-3018  print *,'ERROR: read error encountered in ssoidin namelist file'
+3018  print *,'ERROR: read error encountered in abflagin namelist file'
       call exit(64)
 c
       stop
