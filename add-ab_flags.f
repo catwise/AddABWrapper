@@ -30,6 +30,7 @@ c     1.96 B81120: installed mag upper limit logic
 c     1.97 B81207: restored 4-band cc_flags; added w?sat processing and
 c                  w?mcor values
 c     1.98 B81210: installed w?sat & w?cov processing
+c     1.99 B81214: installed fix for |dec| > 90
 c
 c=======================================================================
 c
@@ -50,7 +51,7 @@ c
       Character*3    Flag, Flag0
       Character*1    w3cc, w4cc, w3cc2, w4cc2
       Real *8        ra, dec, x8, y8, flux, sigflux, mag, sigmag,
-     +               w1m0, w2m0, CoefMag, wsnr
+     +               w1m0, w2m0, CoefMag, wsnr, maxDec, elon, elat
       Real*4         w1x, w2x, w1y, w2y, dist, dist2, w1mcor, w2mcor,
      +               wsat, wcov
       Integer*4      IArgC, LNBlnk, FileID1, nHead, MskBitHist(32), msk,
@@ -62,26 +63,27 @@ c
      +               offscl, nNaN, nn11, nn12, nn21, nn22, kBadw3,
      +               kBadw4, kBad2w3, kBad2w4, kBadness, i1PSF, j1PSF,
      +               iPix, jPix, nPSF, i2PSF, j2PSF, n1Sat, n2Sat,
-     +               n1Cov, n2Cov
+     +               n1Cov, n2Cov, nEcl2Eq
       Logical*4      NeedHelp, anynull, SanityChk, GoodXY1, GoodXY2,
      +               BitSet, dbg, OKhdr, useWCS, NaNwarn, NaNstat1,
      +               NaNpm1, NaNstat2, NaNpm2, doMags, doCov, GotN1,
-     +               GotN2
+     +               GotN2, notWarndEcl
       Integer*4      nullval
       Integer*4, allocatable :: array1(:,:)
       Integer*2      cov1(2048,2048), cov2(2048,2048)
 c
-      Data Vsn/'1.98 B81210'/, nSrc/0/, nHead/0/, SanityChk/.true./,
+      Data Vsn/'1.99 B81214'/, nSrc/0/, nHead/0/, SanityChk/.true./,
      +     doMags/.true./, useWCS/.true./, NaNwarn/.false./,
      +     nn11,nn12,nn21,nn22/4*0/, w1m0,w2m0/2*22.5/, nPSF/2/,
      +     NeedHelp/.False./, MskBitHist/32*0/, dbg/.false./,
      +     notZero/0/, CoefMag/1.085736205d0/, w1mcor/0.145/,
      +     w2mcor/0.177/, kBadw3,kBadw4,kBad2w3,kBad2w4/4*0/,
-     +     doCov/.true./, GotN1,GotN2/2*.false./
+     +     doCov/.true./, GotN1,GotN2/2*.false./, maxDec/89.5/,
+     +     notWarndEcl/.true./, nEcl2Eq/0/
 c
       Common / VDT / CDate, CTime, Vsn
 c
-      namelist / abflagin / doCov, doMags, nPSF, w1m0, w1mcor,
+      namelist / abflagin / doCov, doMags, maxDec, nPSF, w1m0, w1mcor,
      +                      w2m0, w2mcor
 c
 c=======================================================================
@@ -1085,11 +1087,28 @@ c                                      ! compute w?cov and w?sat
         wcov = float(n2Cov)/float(nPix)
         write(Line(IFA(48):IFb(48)),'(f8.2)') wcov
       end if
+c                                      ! tweak ra & dec near poles
+      if (dabs(dec) .gt. maxDec) then
+        read(Line(IFa(171):IFb(171)), *, err=700) elon
+        read(Line(IFa(173):IFb(173)), *, err=700) elat
+        call Ec2Cel(elon, elat, ra, dec)
+        write (Line(IFA(3):IFb(3)),'(f12.7)') ra
+        write (Line(IFA(4):IFb(4)),'(f12.7)') dec
+        nEcl2Eq = nEcl2Eq + 1
+        go to 999
+700     if (notWarndEcl) then
+          print *,
+     +   'WARNING: read error on ecl lon/lat for source', nSrc
+          print *,'         this is the first and only such warning'
+          notWarndEcl = .false.
+        end if
+      end if
 c
-      write(20,'(a)') Line(1:lnblnk(line))
+999   write(20,'(a)') Line(1:lnblnk(line))
       go to 10
 c
 1000  print *,' No. data rows processed:', nSrc
+      if (nEcl2Eq .gt. 0) print *,' No. Ecl2Eq conversions: ',nEcl2Eq 
 c
       if (nSrc .ne. nSrcHdr) then
         print *,
@@ -1697,4 +1716,34 @@ c
       kBadness = 0
       return
       end
-      
+c
+c=======================================================================
+c
+      subroutine Ec2Cel(Long, Lat, RA, Dec)
+c
+      real*8 RA, Dec, Long, Lat, SOb, Cob, X, Y, Z, d2r,
+     +       cLong, cLat, sLong, sLat, X2, Y2
+c
+      data d2r/1.745329252d-2/, cOb, sOb/0.91748206d0, 0.39777716d0/
+c
+c-----------------------------------------------------------------------
+c
+      cLong = dcos(d2r*Long)
+      cLat  = dcos(d2r*Lat)
+      sLong = dsin(d2r*Long)
+      sLat  = dsin(d2r*Lat)
+c
+      X =  sLat
+      Y = -cLat*sLong
+      Z =  cLat*cLong
+c
+      X2 = X*Cob - Y*Sob
+      Y2 = X*Sob + Y*Cob
+c     Z2 = Z
+c
+      Dec  = dasin(X2)/d2r
+      RA = datan2(-Y2,Z)/d2r
+      if (RA .lt. 0.0d0) RA = RA + 360.0d0
+c
+      return
+      end
