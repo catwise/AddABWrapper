@@ -6,7 +6,7 @@ echo
 echo Wrapper Started at:
 echo $startTime
 echo
-echo Version 1.5 
+echo Version 1.6 \/ Added \$8 \(-n-m files path\) and \$9\(temp2 files path\)  do-ab.tcsh inputs
 echo
 echo This Wrapper will wrap around and run:
 echo 1\) do-add-ab_flags
@@ -104,6 +104,7 @@ else if ($1 == 3) then
         set af_InputPath = $5
         set msk_InputPath = $6
         set OutputPath = $7
+	
 
         echo Input Table == $InputTable
         echo versionID == $versionID
@@ -224,22 +225,21 @@ Mode3:
 	set RadecID = `echo $edited_mdexTable | awk '{print substr($0,0,8)}'`
        ### tempIndex = tempIndex - sizeof($RadecID) - sizeof("_af")
 	@ tempIndex = ($tempIndex - 8 - 3)
-	#@ tempIndex = ($tempIndex - 8 )
 	set RestOfTablename = `basename $mdexTable | awk -v endIndex=$tempIndex '{print substr($0,9,endIndex)}'` 
 
 
 	set originalTable = ${edited_mdexTablePATH}/${RadecID}${RestOfTablename}.tbl
 	echo "__________________________________________________________________________________________________"
-        echo "Current input afTable == "$mdexTable
-        echo "Edited_Current input afTable == "${edited_mdexTablePATH}//${edited_mdexTable}.tbl
-        echo "RadecID == "$RadecID
-	echo "RestOfTablename == "$RestOfTablename
-	echo "versionID == "${versionID}
-	echo "mdexInputPath == "${mdexInputPath}
-	echo "af_InputPath == "${af_InputPath}
-	echo "msk_InputPath == "${msk_InputPath}
-	echo "OutputPath  == "${OutputPath}
-	echo "originalTable == ${originalTable}"
+        echo "Current input afTable = "$mdexTable
+        echo "Edited_Current input afTable = "${edited_mdexTablePATH}//${edited_mdexTable}.tbl
+        echo "RadecID = "$RadecID
+	echo "RestOfTablename = "$RestOfTablename
+	echo "versionID = "${versionID}
+	echo "mdexInputPath = "${mdexInputPath}
+	echo "af_InputPath = "${af_InputPath}
+	echo "msk_InputPath = "${msk_InputPath}
+	echo "OutputPath  = "${OutputPath}
+	echo "originalTable = ${originalTable}"
 	echo "__________________________________________________________________________________________________\n"
 	
 	echo Unzipping $mdexTable to ${edited_mdexTablePATH}/${edited_mdexTable}.tbl
@@ -258,13 +258,33 @@ Mode3:
         endif
 	echo
 
-       ### John Fowler's Single Tile proram
+
+       ### John Fowler's Single Tile program
+	echo Preparing inputs \$8 \(-n-m files path\) and \$9\(temp2 files path\) for do-ab.tcsh
+	set ra = `echo ${RadecID} | awk '{print substr($0,0,3)}'`
+	echo ra == $ra
+
+	set n_m_path = ""
+	set temp2_path = ""  
+	set currIP = `dig +short myip.opendns.com @resolver1.opendns.com`
+        echo current IP = $currIP
+        if($currIP == "137.78.30.21") then #Tyto
+        	set n_m_path = "/Volumes/tyto2/UnWISE/${ra}/${RadecID}"
+		set temp2_path = "/Volumes/tyto1/Ab_files_v1"
+        else if($currIP == "137.78.80.75") then  #Otus
+        	set n_m_path = "/Volumes/otus1/UnWISE/${ra}/${RadecID}"
+		set temp2_path = "/Volumes/otus5/Ab_files_v1"
+	else if($currIP == "137.78.80.72") then #Athene
+        	set n_m_path = "/Volumes/athene3/UnWISE/${ra}/${RadecID}"
+		set temp2_path = "/Volumes/athene5/Ab_files_v1"
+	endif
+	echo "n_m_path = "${n_m_path}
+	echo "temp2_path ="${temp2_path}
+
        ###Program call
-	#appending v0,  _ab_v0
-	#TODO add version 
 	echo John Fowler Program call:
-      	echo "${wrapperDir}/do-ab.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${mdexInputPath} ${af_InputPath} ${msk_InputPath} ${OutputPath} \n" 
-	${wrapperDir}/do-ab.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${mdexInputPath} ${af_InputPath} ${msk_InputPath} ${OutputPath} 
+      	echo "${wrapperDir}/do-ab.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${mdexInputPath} ${af_InputPath} ${msk_InputPath} ${OutputPath} ${n_m_path} ${temp2_path} \n" 
+	${wrapperDir}/do-ab.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${mdexInputPath} ${af_InputPath} ${msk_InputPath} ${OutputPath} ${n_m_path} ${temp2_path}
 	set saved_status = $? 
 	#check exit status
 	echo stils saved_status == $saved_status 
@@ -303,7 +323,7 @@ rm  ${originalTable}
 echo
        #rsync step
 	if($rsyncSet == "true") then
-       #rsync
+       #rsync output dir from Current server to other 2 servers (Tyto, Otus, Athene)
 	set CatWISEDir = ${OutputPath}
         echo running rsync on tile $RadecID
         set currIP = `dig +short myip.opendns.com @resolver1.opendns.com`
@@ -316,16 +336,14 @@ echo
                #Transfer Tyto CatWISE/ dir to Otus
                 echo rsync Tyto\'s $CatWISEDir ${RadecID}${RestOfTablename}_ab_v0.tbl.gz, gsa-${RadecID}-af.txt, unwise-${RadecID}-msk.fit to Otus $otus_CatWISEDir
                 ssh ${user}@137.78.80.75 "mkdir -p $otus_CatWISEDir"
-                rsync -avu $CatWISEDir/${RadecID}${RestOfTablename}_ab_v0.tbl.gz ${user}@137.78.80.75:$otus_CatWISEDir
-                rsync -avu $CatWISEDir/gsa-${RadecID}-af.txt ${user}@137.78.80.75:$otus_CatWISEDir
-                rsync -avu $CatWISEDir/unwise-${RadecID}-msk.fit ${user}@137.78.80.75:$otus_CatWISEDir
+                rsync -avur $CatWISEDir/ ${user}@137.78.80.75:$otus_CatWISEDir
 
                #Transfer Tyto CatWISE/ dir to Athene
                 echo rsync Tyto\'s $CatWISEDir ${RadecID}${RestOfTablename}_ab_v0.tbl.gz, gsa-${RadecID}-af.txt, unwise-${RadecID}-msk.fit to Athene $athene_CatWISEDir
                 ssh ${user}@137.78.80.72 "mkdir -p $athene_CatWISEDir"
-                rsync -avu $CatWISEDir/${RadecID}${RestOfTablename}_ab_v0.tbl.gz ${user}@137.78.80.75:$athene_CatWISEDir
-                rsync -avu $CatWISEDir/gsa-${RadecID}-af.txt ${user}@137.78.80.75:$athene_CatWISEDir
-                rsync -avu $CatWISEDir/unwise-${RadecID}-msk.fit ${user}@137.78.80.75:$athene_CatWISEDir
+                rsync -avur $CatWISEDir/ ${user}@137.78.80.75:$athene_CatWISEDir
+
+
         else if($currIP == "137.78.80.75") then  #Otus
                 set tyto_CatWISEDir = `echo $CatWISEDir | sed 's/otus5/tyto1/g'`
                 set athene_CatWISEDir = `echo $CatWISEDir | sed 's/otus5/athene5/g'`
@@ -334,16 +352,14 @@ echo
                #Transfer Otus CatWISE/ dir to Tyto
                 echo rsync Otus\'s $CatWISEDir${RadecID}${RestOfTablename}_ab_v0.tbl.gz, gsa-${RadecID}-af.txt, unwise-${RadecID}-msk.fit to Tyto $tyto_CatWISEDir
                 ssh ${user}@137.78.30.21 "mkdir -p $tyto_CatWISEDir"
-                rsync -avu $CatWISEDir/${RadecID}${RestOfTablename}_ab_v0.tbl.gz ${user}@137.78.80.75:$tyto_CatWISEDir
-                rsync -avu $CatWISEDir/gsa-${RadecID}-af.txt ${user}@137.78.80.75:$tyto_CatWISEDir
-                rsync -avu $CatWISEDir/unwise-${RadecID}-msk.fit ${user}@137.78.80.75:$tyto_CatWISEDir
+                rsync -avur $CatWISEDir/ ${user}@137.78.80.75:$tyto_CatWISEDir
 
                #Transfer Otus CatWISE/ to Athene
                 echo rsync Otus\'s $CatWISEDir ${RadecID}${RestOfTablename}_ab_v0.tbl.gz, gsa-${RadecID}-af.txt, unwise-${RadecID}-msk.fit to Athene $athene_CatWISEDir
                 ssh ${user}@137.78.80.72 "mkdir -p $athene_CatWISEDir"
-                rsync -avu $CatWISEDir/${RadecID}${RestOfTablename}_ab_v0.tbl.gz ${user}@137.78.80.75:$athene_CatWISEDir
-                rsync -avu $CatWISEDir/gsa-${RadecID}-af.txt ${user}@137.78.80.75:$athene_CatWISEDir
-                rsync -avu $CatWISEDir/unwise-${RadecID}-msk.fit ${user}@137.78.80.75:$athene_CatWISEDir
+                rsync -avur $CatWISEDir/ ${user}@137.78.80.75:$athene_CatWISEDir
+
+
         else if($currIP == "137.78.80.72") then #Athene
                 set tyto_CatWISEDir = `echo $CatWISEDir | sed 's/athene5/tyto1/g'`
                 set otus_CatWISEDir = `echo $CatWISEDir | sed 's/athene5/otus5/g'`
@@ -352,16 +368,12 @@ echo
 	       #Transfer to Tyto
                 echo rsync Athene\'s $CatWISEDir ${RadecID}${RestOfTablename}_ab_v0.tbl.gz, gsa-${RadecID}-af.txt, unwise-${RadecID}-msk.fit to Tyto $tyto_CatWISEDir
 		ssh ${user}@137.78.30.21 "mkdir -p $tyto_CatWISEDir"
-		rsync -avu $CatWISEDir/${RadecID}${RestOfTablename}_ab_v0.tbl.gz ${user}@137.78.80.75:$tyto_CatWISEDir
-                rsync -avu $CatWISEDir/gsa-${RadecID}-af.txt ${user}@137.78.80.75:$tyto_CatWISEDir
-                rsync -avu $CatWISEDir/unwise-${RadecID}-msk.fit ${user}@137.78.80.75:$tyto_CatWISEDir
+		rsync -avur $CatWISEDir/ ${user}@137.78.80.75:$tyto_CatWISEDir
 
                #Transfer to Otus
                 echo rsync Athene\'s $CatWISEDir ${RadecID}${RestOfTablename}_ab_v0.tbl.gz, gsa-${RadecID}-af.txt, unwise-${RadecID}-msk.fit to Otus $otus_CatWISEDir
                 ssh ${user}@137.78.80.75 "mkdir -p $otus_CatWISEDir"
-                rsync -avu $CatWISEDir/${RadecID}${RestOfTablename}_ab_v0.tbl.gz ${user}@137.78.80.75:$otus_CatWISEDir
-                rsync -avu $CatWISEDir/gsa-${RadecID}-af.txt ${user}@137.78.80.75:$otus_CatWISEDir
-                rsync -avu $CatWISEDir/unwise-${RadecID}-msk.fit ${user}@137.78.80.75:$otus_CatWISEDir
+                rsync -avur $CatWISEDir/ ${user}@137.78.80.75:$otus_CatWISEDir
         endif
         endif
 
