@@ -31,6 +31,8 @@ c     1.97 B81207: restored 4-band cc_flags; added w?sat processing and
 c                  w?mcor values
 c     1.98 B81210: installed w?sat & w?cov processing
 c     1.99 B81214: installed fix for |dec| > 90
+c     1.99 B81215: installed fix for |dec_pm| > 90;
+c                  changed w?cov to f8.1 to accomodate > 9999
 c
 c=======================================================================
 c
@@ -51,7 +53,8 @@ c
       Character*3    Flag, Flag0
       Character*1    w3cc, w4cc, w3cc2, w4cc2
       Real *8        ra, dec, x8, y8, flux, sigflux, mag, sigmag,
-     +               w1m0, w2m0, CoefMag, wsnr, maxDec, elon, elat
+     +               w1m0, w2m0, CoefMag, wsnr, maxDec, elon, elat,
+     +               ra_pm, dec_pm
       Real*4         w1x, w2x, w1y, w2y, dist, dist2, w1mcor, w2mcor,
      +               wsat, wcov
       Integer*4      IArgC, LNBlnk, FileID1, nHead, MskBitHist(32), msk,
@@ -63,23 +66,23 @@ c
      +               offscl, nNaN, nn11, nn12, nn21, nn22, kBadw3,
      +               kBadw4, kBad2w3, kBad2w4, kBadness, i1PSF, j1PSF,
      +               iPix, jPix, nPSF, i2PSF, j2PSF, n1Sat, n2Sat,
-     +               n1Cov, n2Cov, nEcl2Eq
+     +               n1Cov, n2Cov, nEcl2Eq, nEcl2Eqpm
       Logical*4      NeedHelp, anynull, SanityChk, GoodXY1, GoodXY2,
      +               BitSet, dbg, OKhdr, useWCS, NaNwarn, NaNstat1,
      +               NaNpm1, NaNstat2, NaNpm2, doMags, doCov, GotN1,
-     +               GotN2, notWarndEcl
+     +               GotN2, notWarndEcl, notWarndEclpm
       Integer*4      nullval
       Integer*4, allocatable :: array1(:,:)
       Integer*2      cov1(2048,2048), cov2(2048,2048)
 c
-      Data Vsn/'1.99 B81214'/, nSrc/0/, nHead/0/, SanityChk/.true./,
+      Data Vsn/'1.99 B81215'/, nSrc/0/, nHead/0/, SanityChk/.true./,
      +     doMags/.true./, useWCS/.true./, NaNwarn/.false./,
      +     nn11,nn12,nn21,nn22/4*0/, w1m0,w2m0/2*22.5/, nPSF/2/,
      +     NeedHelp/.False./, MskBitHist/32*0/, dbg/.false./,
      +     notZero/0/, CoefMag/1.085736205d0/, w1mcor/0.145/,
      +     w2mcor/0.177/, kBadw3,kBadw4,kBad2w3,kBad2w4/4*0/,
      +     doCov/.true./, GotN1,GotN2/2*.false./, maxDec/89.5/,
-     +     notWarndEcl/.true./, nEcl2Eq/0/
+     +     notWarndEcl,notWarndEclpm/2*.true./, nEcl2Eq,nEcl2Eqpm/2*0/
 c
       Common / VDT / CDate, CTime, Vsn
 c
@@ -838,7 +841,7 @@ c
         w1ab_map_str = '         null'
         w2ab_map     = '     null'
         w2ab_map_str = '         null'
-        go to 900
+        go to 700
       end if
 c
       GoodXY1 = index(Line(IFA(9):IFB(9)),  'null') .eq. 0
@@ -863,7 +866,7 @@ c
         w1ab_map_str = '         null'
         w2ab_map     = '     null'
         w2ab_map_str = '         null'
-        go to 900
+        go to 700
       end if
 c
 500   msk = array1(iPix,jPix)
@@ -1022,23 +1025,23 @@ c
       w1ab_map_str(1:1) = ' '
       w2ab_map_str(1:1) = ' '
 c
-800   if (lnblnk(ab_flags) .lt. 9) then
+600   if (lnblnk(ab_flags) .lt. 9) then
         ab_flags = ' '//ab_flags
-        go to 800
+        go to 600
       end if
-810   if (lnblnk(w1ab_map_str) .lt. 13) then
+610   if (lnblnk(w1ab_map_str) .lt. 13) then
         w1ab_map_str = ' '//w1ab_map_str
-        go to 810
+        go to 610
       end if
-820   if (lnblnk(w2ab_map_str) .lt. 13) then
+620   if (lnblnk(w2ab_map_str) .lt. 13) then
         w2ab_map_str = ' '//w2ab_map_str
-        go to 820
+        go to 620
       end if
 c
-900   Line =  Line(1:Ifb(191))//Line(IFa(385):IFb(385))
+700   Line =  Line(1:Ifb(191))//Line(IFa(385):IFb(385))
      +  //Line(IFa(394):IFb(398))//nAWstr//ab_flags
      +  //w1ab_map//w1ab_map_str//w2ab_map//w2ab_map_str
-510   nNaN = index(Line,' NaN')
+710   nNaN = index(Line,' NaN')
       if (nNaN .gt. 0) then
         print *, 'ERROR: NaN detected on output line #',
      +  nSrc, ' at position', nNaN
@@ -1047,7 +1050,7 @@ c
         Line(nNaN:nNaN+3) = 'null'
         print *,'replaced with null'
         print *,Line(1:lnblnk(Line))
-        go to 510        
+        go to 710        
       end if
 c                                      ! plug in canonical w1mcor & w2mcor
       write(Line(IFa(44):IFb(44)),'(f7.3)') w1mcor
@@ -1066,8 +1069,8 @@ c                                      ! compute w?cov and w?sat
       n2Sat = 0
       n1Cov = 0
       n2Cov = 0
-      do 610 j = j1PSF, j2PSF
-        do 600 i = i1PSF, i2PSF
+      do 750 j = j1PSF, j2PSF
+        do 740 i = i1PSF, i2PSF
           nPix = nPix + 1
           if (BitSet(array1(i,j),4)) n1Sat = n1Sat + 1
           if (BitSet(array1(i,j),5)) n2Sat = n2Sat + 1
@@ -1075,28 +1078,41 @@ c                                      ! compute w?cov and w?sat
             n1Cov = n1Cov + cov1(i,j)
             n2Cov = n2Cov + cov2(i,j)      
           end if
-600     continue
-610   continue
+740     continue
+750   continue
       wsat = float(n1Sat)/float(nPix)
       write(Line(IFA(37):IFb(37)),'(f8.5)') wsat
       wsat = float(n2Sat)/float(nPix)
       write(Line(IFA(38):IFb(38)),'(f8.5)') wsat
       if (doCov) then
         wcov = float(n1Cov)/float(nPix)
-        write(Line(IFA(43):IFb(43)),'(f8.2)') wcov
+        write(Line(IFA(43):IFb(43)),'(f8.1)') wcov
         wcov = float(n2Cov)/float(nPix)
-        write(Line(IFA(48):IFb(48)),'(f8.2)') wcov
+        write(Line(IFA(48):IFb(48)),'(f8.1)') wcov
       end if
 c                                      ! tweak ra & dec near poles
       if (dabs(dec) .gt. maxDec) then
-        read(Line(IFa(171):IFb(171)), *, err=700) elon
-        read(Line(IFa(173):IFb(173)), *, err=700) elat
-        call Ec2Cel(elon, elat, ra, dec)
-        write (Line(IFA(3):IFb(3)),'(f12.7)') ra
-        write (Line(IFA(4):IFb(4)),'(f12.7)') dec
-        nEcl2Eq = nEcl2Eq + 1
-        go to 999
-700     if (notWarndEcl) then
+        if (index(Line(IFa(171):IFb(173)),'null') .eq. 0) then
+          read(Line(IFa(171):IFb(171)), *, err=760) elon
+          read(Line(IFa(173):IFb(173)), *, err=760) elat
+          call Ec2Cel(elon, elat, ra, dec)
+          write (Line(IFA(3):IFb(3)),'(f12.7)') ra
+          write (Line(IFA(4):IFb(4)),'(f12.7)') dec
+          nEcl2Eq = nEcl2Eq + 1
+        else if (dabs(dec) .gt. 90.0d0) then
+          ra = ra + 180.0d0
+          if (ra .gt. 360.0d0) ra = ra - 360.0d0
+          if (dec .gt. 0.0d0) then
+            dec = 180.0d0 - dec
+          else
+            dec = -180.0d0 - dec
+          end if
+          write (Line(IFA(3):IFb(3)),'(f12.7)') ra
+          write (Line(IFA(4):IFb(4)),'(f12.7)') dec
+          nEcl2Eq = nEcl2Eq + 1
+        end if
+        go to 800
+760     if (notWarndEcl) then
           print *,
      +   'WARNING: read error on ecl lon/lat for source', nSrc
           print *,'         this is the first and only such warning'
@@ -1104,11 +1120,36 @@ c                                      ! tweak ra & dec near poles
         end if
       end if
 c
-999   write(20,'(a)') Line(1:lnblnk(line))
+800   if (index(Line(IFa(142):IFb(143)),'null') .gt. 0) go to 900
+      read(Line(IFa(142):Ifb(142)), *, err = 810) dec_pm
+      if (dabs(dec_pm) .gt. 90.0d0) then
+        read(Line(IFa(141):Ifb(141)), *, err = 810) ra_pm
+        ra_pm = ra_pm + 180.0d0
+        if (ra_pm .gt. 360.0d0) ra_pm = ra_pm - 360.0d0
+        if (dec_pm .gt. 0.0d0) then
+          dec_pm = 180.0d0 - dec_pm
+        else
+          dec_pm = -180.0d0 - dec_pm
+        end if
+        write (Line(IFA(141):IFb(141)),'(f12.7)') ra_pm
+        write (Line(IFA(142):IFb(142)),'(f12.7)') dec_pm
+        nEcl2Eqpm = nEcl2Eqpm + 1
+        go to 900
+      end if
+810   if (notWarndEclpm) then
+        print *,
+     +  'WARNING: read error on ra_pm/dec_pm for source', nSrc
+        print *,'         this is the first and only such warning'
+        notWarndEclpm = .false.
+      end if
+c
+900   write(20,'(a)') Line(1:lnblnk(line))
       go to 10
 c
 1000  print *,' No. data rows processed:', nSrc
-      if (nEcl2Eq .gt. 0) print *,' No. Ecl2Eq conversions: ',nEcl2Eq 
+      if (nEcl2Eq .gt. 0)   print *,' No. Ecl2Eq dec fixes:   ',nEcl2Eq 
+      if (nEcl2Eqpm .gt. 0) print *,' No. Ecl2Eq dec_pm fixes:',
+     +    nEcl2Eqpm 
 c
       if (nSrc .ne. nSrcHdr) then
         print *,
