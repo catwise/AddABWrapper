@@ -6,7 +6,7 @@ echo
 echo Wrapper Started at:
 echo $startTime
 echo
-echo Version 1.6 \/ Added \$8 \(-n-m files path\) and \$9\(temp2 files path\)  do-ab.tcsh inputs
+echo Version 1.7  1\) use \$5 in input list + input file  2\) added \-gsa 3\) make sure mdex and _af file path is different 4\) added rsync \(but not tested yet\!\!\!\) 
 echo
 echo This Wrapper will wrap around and run:
 echo 1\) do-add-ab_flags
@@ -18,11 +18,16 @@ echo 1\) do-add-ab_flags
 #check hyphenated argument
 @ i = 0
 set rsyncSet = "false"
+set gsaSet = "false"
 while ($i < $# + 1)
      #user input nameslist -nl argument
       if("$argv[$i]" == "-rsync") then
         echo Argument "-rsync" detected. Will rsync Tyto, Otus, and Athene.
         set rsyncSet = "true"
+      endif
+      if("$argv[$i]" == "-gsa") then
+        echo Argument "-gsa" detected. Will call gsa in do-ab_gsa.tcsh
+        set gsaSet = "true"
       endif
       @ i +=  1
 end
@@ -34,9 +39,9 @@ if ($# < 7) then
         echo ""
         echo "ERROR: not enough arguments:"
         echo Mode 2 call:
-        echo ./addABWrapper.tcsh 2 inputList.txt \<versionID\> \<mdexInputPath\> \<af_InputPath\> \<msk_InputPath\> \<OutputPath\>
+        echo ./addABWrapper.tcsh 2 input_afList.txt \<versionID\> \<mdexInputPath\> \<af_InputPath\> \<msk_InputPath\> \<OutputPath\>
         echo Mode 3 call:
-        echo ./addABWrapper.tcsh 3 TileName \<versionID\> \<mdexInputPath\> \<af_InputPath\> \<msk_InputPath\> \<OutputPath\>
+        echo ./addABWrapper.tcsh 3 _afTile-file \<versionID\> \<mdexInputPath\> \<af_InputPath\> \<msk_InputPath\> \<OutputPath\>
         echo
         echo Exiting...
         exit
@@ -106,7 +111,7 @@ else if ($1 == 3) then
         set OutputPath = $7
 	
 
-        echo Input Table == $InputTable
+        echo Input _af Table name == $InputTable  # This is the input _af table name
         echo versionID == $versionID
         echo Mdex Input Path == $mdexInputPath
         echo af Input Path == $af_InputPath
@@ -114,7 +119,13 @@ else if ($1 == 3) then
         echo Output Path == $OutputPath
 
         #if directories dont exist, throw error
-        if(! -f $InputTable) then
+        if(! -d $af_InputPath) then
+                echo ERROR: Input Path directory $af_InputPath does not exist.
+                echo
+                echo Exiting...
+                exit
+        endif
+        if(! -f $af_InputPath/$InputTable) then
 		echo
                 echo ERROR: $InputTable doest not exist.
                 echo
@@ -123,12 +134,6 @@ else if ($1 == 3) then
         endif
         if(! -d $mdexInputPath) then
                 echo ERROR: Input Path directory $mdexInputPath does not exist.
-                echo
-                echo Exiting...
-                exit
-        endif
-        if(! -d $af_InputPath) then
-                echo ERROR: Input Path directory $af_InputPath does not exist.
                 echo
                 echo Exiting...
                 exit
@@ -158,7 +163,7 @@ else
         echo Mode 2 call:
         echo ./addABWrapper.tcsh 2 inputList.txt \<versionID\> \<mdexInputPath\> \<af_InputPath\> \<msk_InputPath\> \<OutputPath\>
         echo Mode 3 call:
-        echo ./addABWrapper.tcsh 3 TileName \<versionID\> \<mdexInputPath\> \<af_InputPath\> \<msk_InputPath\> \<OutputPath\>
+        echo ./addABWrapper.tcsh 3 _afTile-file \<versionID\> \<mdexInputPath\> \<af_InputPath\> \<msk_InputPath\> \<OutputPath\>
 	echo
         echo Exiting...
 	exit
@@ -171,15 +176,13 @@ Mode2:
     foreach table (`cat $InputsList`)    
         echo ===================================== - START AddABWrapper wrapper loop iteration - ======================================
      
-        set mdexTable = `echo $table`
-
-        echo "Current input MDEXTable == "$mdexTable
+        echo "Current input MDEXTable == "${table}
         echo Calling addABWrapper.tcsh Mode3 on ${table}\: 
 	if($rsyncSet == "true") then
-		echo "${wrapperDir}/addABWrapper.tcsh 3 $table $versionID $mdexInputPath $af_InputPath $msk_InputPath $OutputPath -rsync"
+		echo "${wrapperDir}/addABWrapper.tcsh 3 $af_InputPath/$table $versionID $mdexInputPath $af_InputPath $msk_InputPath $OutputPath -rsync"
 		(echo y | ${wrapperDir}/addABWrapper.tcsh 3 $table $versionID $mdexInputPath $af_InputPath $msk_InputPath $OutputPath -rsync) &
 	else
-		echo "${wrapperDir}/addABWrapper.tcsh 3 $table $versionID $mdexInputPath $af_InputPath $msk_InputPath $OutputPath"
+		echo "${wrapperDir}/addABWrapper.tcsh 3 $af_InputPath/$table $versionID $mdexInputPath $af_InputPath $msk_InputPath $OutputPath"
 		(echo y | ${wrapperDir}/addABWrapper.tcsh 3 $table $versionID $mdexInputPath $af_InputPath $msk_InputPath $OutputPath) &
 	endif
 	
@@ -208,30 +211,31 @@ Mode2:
     goto Done
 
 Mode3:	
-       ###Given mdexTable == 1497p015_opt1_20180609_083107.tbl.gz,
-        set mdexTable = $InputTable 
-	set tempSize = `basename $mdexTable  | awk '{print length($0)}'`
+       ###Given afTableName == 1497p015_opt1_20180609_083107.tbl.gz,
+        set afTableName = $InputTable 
+	set tempSize = `basename $afTableName  | awk '{print length($0)}'`
         @ tempIndex = ($tempSize - 3 - 4) 
        ### tempIndex = filesize - sizeof(".gz") - sizeof(".tbl")
 
-       ###Given mdexTable == 1497p015_opt1_20180609_083107.tbl.gz,
-       ###  edited_mdexTable == 1497p015_opt1_20180609_083107
-       ###  edited_mdexTablePATH is the path that the mdexTable resides in
-       ###  RadecID == 1497015
-       ###  RestOfTablename == _opt1_20180609_083107
-        set edited_mdexTable = `basename $mdexTable | awk -v endIndex=$tempIndex '{print substr($0,0,endIndex)}'`
-        set edit_mdexTablePATH = `dirname $mdexTable`
-	set edited_mdexTablePATH = `cd $edit_mdexTablePATH && pwd`
-	set RadecID = `echo $edited_mdexTable | awk '{print substr($0,0,8)}'`
-       ### tempIndex = tempIndex - sizeof($RadecID) - sizeof("_af")
+       ### Given afTableName = 		1497p015_opt1_20180609_083107.tbl.gz,
+       ###  edited_afTableName = 	1497p015_opt1_20180609_083107
+       ###  edited_afTableNamePATH =	# full path that the afTable resides in
+       ###  RadecID = 			1497015
+       ###  RestOfTablename = 		_opt1_20180609_083107
+        set edited_afTableName = `basename $afTableName | awk -v endIndex=$tempIndex '{print substr($0,0,endIndex)}'`
+        set edit_afTableNamePATH = $af_InputPath
+	set edited_afTableNamePATH = `cd $edit_afTableNamePATH && pwd`
+	set RadecID = `echo $afTableName | awk '{print substr($0,0,8)}'`
+        ### tempIndex = tempIndex - sizeof($RadecID) - sizeof("_af")
 	@ tempIndex = ($tempIndex - 8 - 3)
-	set RestOfTablename = `basename $mdexTable | awk -v endIndex=$tempIndex '{print substr($0,9,endIndex)}'` 
+	set RestOfTablename = `basename $afTableName | awk -v endIndex=$tempIndex '{print substr($0,9,endIndex)}'` 
 
 
-	set originalTable = ${edited_mdexTablePATH}/${RadecID}${RestOfTablename}.tbl
+	set originalMdexTable = $mdexInputPath/${RadecID}${RestOfTablename}.tbl
+	set originalafTable = ${edited_afTableNamePATH}/${edited_afTableName}.tbl 
 	echo "__________________________________________________________________________________________________"
-        echo "Current input afTable = "$mdexTable
-        echo "Edited_Current input afTable = "${edited_mdexTablePATH}//${edited_mdexTable}.tbl
+        echo "Current input afTable = "$afTableName
+        echo "Edited_Current input afTable = "$originalafTable
         echo "RadecID = "$RadecID
 	echo "RestOfTablename = "$RestOfTablename
 	echo "versionID = "${versionID}
@@ -239,15 +243,16 @@ Mode3:
 	echo "af_InputPath = "${af_InputPath}
 	echo "msk_InputPath = "${msk_InputPath}
 	echo "OutputPath  = "${OutputPath}
-	echo "originalTable = ${originalTable}"
+	echo "originalMdexTable = ${originalMdexTable}"
 	echo "__________________________________________________________________________________________________\n"
 	
-	echo Unzipping $mdexTable to ${edited_mdexTablePATH}/${edited_mdexTable}.tbl
-	gunzip -f -c -k $mdexTable > ${edited_mdexTablePATH}/${edited_mdexTable}.tbl 
+	#TODO December 20 11:18 look at the mdex logic
+	#TODO rename afTableName to afTable
+	echo Unzipping ${afTableName} to ${originalafTable}
+	gunzip -f -c -k ${afTableName} > ${originalafTable}  # Unzip _af file
 
-	echo Unzipping ${originalTable}.gz to ${originalTable}
-	gunzip -f -c -k ${originalTable}.gz > ${originalTable}
-
+	echo Unzipping ${originalMdexTable}.gz to ${originalMdexTable}
+	gunzip -f -c -k ${originalMdexTable}.gz > ${originalMdexTable}  # Unzip mdex file
 	set saved_status = $? #Error Checking
        ### check exit status
         echo gunzip saved_status == ${saved_status}
@@ -281,10 +286,18 @@ Mode3:
 	echo "n_m_path = "${n_m_path}
 	echo "temp2_path ="${temp2_path}
 
-       ###Program call
-	echo John Fowler Program call:
-      	echo "${wrapperDir}/do-ab.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${mdexInputPath} ${af_InputPath} ${msk_InputPath} ${OutputPath} ${n_m_path} ${temp2_path} \n" 
-	${wrapperDir}/do-ab.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${mdexInputPath} ${af_InputPath} ${msk_InputPath} ${OutputPath} ${n_m_path} ${temp2_path}
+	if($gsaSet == "true") then
+
+        	### Program call
+		echo John Fowler Program call:
+      		echo "${wrapperDir}/do-ab_gsa.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${mdexInputPath} ${af_InputPath} ${msk_InputPath} ${OutputPath} ${n_m_path} ${temp2_path} \n" 
+		${wrapperDir}/do-ab_gsa.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${mdexInputPath} ${af_InputPath} ${msk_InputPath} ${OutputPath} ${n_m_path} ${temp2_path}
+	else
+        	### Program call
+		echo John Fowler Program call:
+      		echo "${wrapperDir}/do-ab_NOgsa.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${mdexInputPath} ${af_InputPath} ${msk_InputPath} ${OutputPath} ${n_m_path} ${temp2_path} \n" 
+		${wrapperDir}/do-ab_NOgsa.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${mdexInputPath} ${af_InputPath} ${msk_InputPath} ${OutputPath} ${n_m_path} ${temp2_path}
+	endif
 	set saved_status = $? 
 	#check exit status
 	echo stils saved_status == $saved_status 
@@ -307,18 +320,18 @@ exit
 
 #Done section for gzipping rsyncing
 Mode3_Done:
-echo DONE. Output: ${edited_mdexTablePATH}/${edited_mdexTable}_af.tbl 
+echo DONE. Output: ${edited_afTableNamePATH}/${edited_afTableName}_ab.tbl 
 echo AddABWrapper on ${RadecID} Mode: ${1} Done
 set endTime = `date '+%m/%d/%Y %H:%M:%S'`
-echo "rm  ${edited_mdexTablePATH}/${edited_mdexTable}.tbl"
+echo "rm  ${originalafTable}"
 echo "rm  ${originalTable}"
 #rm af file and rm original mdex table
-rm  ${edited_mdexTablePATH}/${edited_mdexTable}.tbl
+rm  ${originalafTable}
 rm  ${originalTable}
 #TODO:
 # change arguments to 3 input directories:
 # ab_masks, af, mdex tables,
-# these 3 types of tiles in different dirrectories
+# these 3 types of tiles in different directories
 # ab, af, mdex
 echo
        #rsync step
@@ -334,12 +347,12 @@ echo
                 echo You are on Tyto!
 
                #Transfer Tyto CatWISE/ dir to Otus
-                echo rsync Tyto\'s $CatWISEDir ${RadecID}${RestOfTablename}_ab_v0.tbl.gz, gsa-${RadecID}-af.txt, unwise-${RadecID}-msk.fit to Otus $otus_CatWISEDir
+                echo rsync Tyto\'s $CatWISEDir ${RadecID}${RestOfTablename}_ab.tbl.gz, gsa-${RadecID}-af.txt, unwise-${RadecID}-msk.fit to Otus $otus_CatWISEDir
                 ssh ${user}@137.78.80.75 "mkdir -p $otus_CatWISEDir"
                 rsync -avur $CatWISEDir/ ${user}@137.78.80.75:$otus_CatWISEDir
 
                #Transfer Tyto CatWISE/ dir to Athene
-                echo rsync Tyto\'s $CatWISEDir ${RadecID}${RestOfTablename}_ab_v0.tbl.gz, gsa-${RadecID}-af.txt, unwise-${RadecID}-msk.fit to Athene $athene_CatWISEDir
+                echo rsync Tyto\'s $CatWISEDir ${RadecID}${RestOfTablename}_ab.tbl.gz, gsa-${RadecID}-af.txt, unwise-${RadecID}-msk.fit to Athene $athene_CatWISEDir
                 ssh ${user}@137.78.80.72 "mkdir -p $athene_CatWISEDir"
                 rsync -avur $CatWISEDir/ ${user}@137.78.80.75:$athene_CatWISEDir
 
@@ -350,12 +363,12 @@ echo
                 echo You are on Otus!
 
                #Transfer Otus CatWISE/ dir to Tyto
-                echo rsync Otus\'s $CatWISEDir${RadecID}${RestOfTablename}_ab_v0.tbl.gz, gsa-${RadecID}-af.txt, unwise-${RadecID}-msk.fit to Tyto $tyto_CatWISEDir
+                echo rsync Otus\'s $CatWISEDir${RadecID}${RestOfTablename}_ab.tbl.gz, gsa-${RadecID}-af.txt, unwise-${RadecID}-msk.fit to Tyto $tyto_CatWISEDir
                 ssh ${user}@137.78.30.21 "mkdir -p $tyto_CatWISEDir"
                 rsync -avur $CatWISEDir/ ${user}@137.78.80.75:$tyto_CatWISEDir
 
                #Transfer Otus CatWISE/ to Athene
-                echo rsync Otus\'s $CatWISEDir ${RadecID}${RestOfTablename}_ab_v0.tbl.gz, gsa-${RadecID}-af.txt, unwise-${RadecID}-msk.fit to Athene $athene_CatWISEDir
+                echo rsync Otus\'s $CatWISEDir ${RadecID}${RestOfTablename}_ab.tbl.gz, gsa-${RadecID}-af.txt, unwise-${RadecID}-msk.fit to Athene $athene_CatWISEDir
                 ssh ${user}@137.78.80.72 "mkdir -p $athene_CatWISEDir"
                 rsync -avur $CatWISEDir/ ${user}@137.78.80.75:$athene_CatWISEDir
 
@@ -366,12 +379,12 @@ echo
                 echo You are on Athene!
                
 	       #Transfer to Tyto
-                echo rsync Athene\'s $CatWISEDir ${RadecID}${RestOfTablename}_ab_v0.tbl.gz, gsa-${RadecID}-af.txt, unwise-${RadecID}-msk.fit to Tyto $tyto_CatWISEDir
+                echo rsync Athene\'s $CatWISEDir ${RadecID}${RestOfTablename}_ab.tbl.gz, gsa-${RadecID}-af.txt, unwise-${RadecID}-msk.fit to Tyto $tyto_CatWISEDir
 		ssh ${user}@137.78.30.21 "mkdir -p $tyto_CatWISEDir"
 		rsync -avur $CatWISEDir/ ${user}@137.78.80.75:$tyto_CatWISEDir
 
                #Transfer to Otus
-                echo rsync Athene\'s $CatWISEDir ${RadecID}${RestOfTablename}_ab_v0.tbl.gz, gsa-${RadecID}-af.txt, unwise-${RadecID}-msk.fit to Otus $otus_CatWISEDir
+                echo rsync Athene\'s $CatWISEDir ${RadecID}${RestOfTablename}_ab.tbl.gz, gsa-${RadecID}-af.txt, unwise-${RadecID}-msk.fit to Otus $otus_CatWISEDir
                 ssh ${user}@137.78.80.75 "mkdir -p $otus_CatWISEDir"
                 rsync -avur $CatWISEDir/ ${user}@137.78.80.75:$otus_CatWISEDir
         endif
