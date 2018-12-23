@@ -19,6 +19,7 @@ echo 1\) do-add-ab_flags
 @ i = 0
 set rsyncSet = "false"
 set gsaSet = "false"
+set withinMode2 = "false"  # Used to determine if mode 3 is being called within mode 2
 while ($i < $# + 1)
      #user input nameslist -nl argument
       if("$argv[$i]" == "-rsync") then
@@ -28,6 +29,11 @@ while ($i < $# + 1)
       if("$argv[$i]" == "-gsa") then
         echo Argument "-gsa" detected. Will call gsa in do-ab_gsa.tcsh
         set gsaSet = "true"
+      endif
+      if("$argv[$i]" == "-withinMode2") then
+        echo Argument "-withinMode2" detected. 
+        set withinMode2 = "true"
+	echo $withinMode2
       endif
       @ i +=  1
 end
@@ -125,13 +131,30 @@ else if ($1 == 3) then
                 echo Exiting...
                 exit
         endif
-        if(! -f $af_InputPath/$InputTable) then
-		echo
-                echo ERROR: $InputTable doest not exist.
-                echo
-                echo Exiting...
-                exit
-        endif
+	if($withinMode2 == "true") then
+	echo "-withinMode2 set, running"
+	echo $withinMode2
+        	if(! -f $InputTable) then
+			echo
+                	echo ERROR: $InputTable doest not exist.
+                	echo
+                	echo Exiting...
+                	exit
+        	endif
+	else
+	echo "-withinMode2 NOT set, NOT running"
+        	if(! -f $af_InputPath/$InputTable) then
+			echo
+                	echo ERROR: $af_InputPath/$InputTable doest not exist.
+                	echo
+                	echo Exiting...
+                	exit
+        	else
+			set InputTable = $af_InputPath/$InputTable
+			echo NEW Input _af Table name == $InputTable
+		endif
+
+	endif
         if(! -d $mdexInputPath) then
                 echo ERROR: Input Path directory $mdexInputPath does not exist.
                 echo
@@ -178,12 +201,24 @@ Mode2:
      
         echo "Current input MDEXTable == "${table}
         echo Calling addABWrapper.tcsh Mode3 on ${table}\: 
-	if($rsyncSet == "true") then
-		echo "${wrapperDir}/addABWrapper.tcsh 3 $af_InputPath/$table $versionID $mdexInputPath $af_InputPath $msk_InputPath $OutputPath -rsync"
-		(echo y | ${wrapperDir}/addABWrapper.tcsh 3 $table $versionID $mdexInputPath $af_InputPath $msk_InputPath $OutputPath -rsync) &
+	if($gsaSet == "true") then
+		if($rsyncSet == "true") then
+			echo "${wrapperDir}/addABWrapper.tcsh 3 $af_InputPath/$table $versionID $mdexInputPath $af_InputPath $msk_InputPath $OutputPath -rsync -gsa -withinMode2"
+			(echo y | ${wrapperDir}/addABWrapper.tcsh 3 $af_InputPath/$table $versionID $mdexInputPath $af_InputPath $msk_InputPath $OutputPath -rsync -gsa \
+				-withinMode2) &
+		else
+			echo "${wrapperDir}/addABWrapper.tcsh 3 $af_InputPath/$table $versionID $mdexInputPath $af_InputPath $msk_InputPath $OutputPath -gsa -withinMode2"
+			(echo y | ${wrapperDir}/addABWrapper.tcsh 3 $af_InputPath/$table $versionID $mdexInputPath $af_InputPath $msk_InputPath $OutputPath -gsa -withinMode2) &
+		endif
 	else
-		echo "${wrapperDir}/addABWrapper.tcsh 3 $af_InputPath/$table $versionID $mdexInputPath $af_InputPath $msk_InputPath $OutputPath"
-		(echo y | ${wrapperDir}/addABWrapper.tcsh 3 $table $versionID $mdexInputPath $af_InputPath $msk_InputPath $OutputPath) &
+		if($rsyncSet == "true") then
+			echo "${wrapperDir}/addABWrapper.tcsh 3 $af_InputPath/$table $versionID $mdexInputPath $af_InputPath $msk_InputPath $OutputPath -rsync -withinMode2"
+			(echo y | ${wrapperDir}/addABWrapper.tcsh 3 $af_InputPath/$table $versionID $mdexInputPath $af_InputPath $msk_InputPath $OutputPath -rsync -withinMode2) &
+		else
+			echo "${wrapperDir}/addABWrapper.tcsh 3 $af_InputPath/$table $versionID $mdexInputPath $af_InputPath $msk_InputPath $OutputPath -withinMode2"
+			(echo y | ${wrapperDir}/addABWrapper.tcsh 3 $af_InputPath/$table $versionID $mdexInputPath $af_InputPath $msk_InputPath $OutputPath -withinMode2) &
+		endif
+	
 	endif
 	
 	set maxInParallel = 12
@@ -211,7 +246,7 @@ Mode2:
     goto Done
 
 Mode3:	
-       ###Given afTableName == 1497p015_opt1_20180609_083107.tbl.gz,
+       ###Given afTableName == /path/1497p015_opt1_20180609_083107.tbl.gz,
         set afTableName = $InputTable 
 	set tempSize = `basename $afTableName  | awk '{print length($0)}'`
         @ tempIndex = ($tempSize - 3 - 4) 
@@ -225,7 +260,7 @@ Mode3:
         set edited_afTableName = `basename $afTableName | awk -v endIndex=$tempIndex '{print substr($0,0,endIndex)}'`
         set edit_afTableNamePATH = $af_InputPath
 	set edited_afTableNamePATH = `cd $edit_afTableNamePATH && pwd`
-	set RadecID = `echo $afTableName | awk '{print substr($0,0,8)}'`
+	set RadecID = `basename $afTableName | awk '{print substr($0,0,8)}'`
         ### tempIndex = tempIndex - sizeof($RadecID) - sizeof("_af")
 	@ tempIndex = ($tempIndex - 8 - 3)
 	set RestOfTablename = `basename $afTableName | awk -v endIndex=$tempIndex '{print substr($0,9,endIndex)}'` 
@@ -324,10 +359,10 @@ echo DONE. Output: ${edited_afTableNamePATH}/${edited_afTableName}_ab.tbl
 echo AddABWrapper on ${RadecID} Mode: ${1} Done
 set endTime = `date '+%m/%d/%Y %H:%M:%S'`
 echo "rm  ${originalafTable}"
-echo "rm  ${originalTable}"
+echo "rm  ${originalMdexTable}"
 #rm af file and rm original mdex table
 rm  ${originalafTable}
-rm  ${originalTable}
+rm  ${originalMdexTable}
 #TODO:
 # change arguments to 3 input directories:
 # ab_masks, af, mdex tables,
