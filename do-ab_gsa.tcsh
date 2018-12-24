@@ -11,8 +11,8 @@ gunzip -f -c -k $8/unwise-$1-w1-n-m.fits.gz > $7/unwise-$1-w1-n-m.fits
 gunzip -f -c -k $8/unwise-$1-w2-n-m.fits.gz > $7/unwise-$1-w2-n-m.fits
 #gunzip -f -c -k $9/$1-temp2.tbl.gz > $9/$1$2-temp2.tbl
 
-/Users/CatWISE/GSAdir/GSA/gsa -td $7 -t $4/$1$2.tbl -t $5/$1$2_af.tbl -ra1 ra -ra2 ra_1 -dec1 dec -dec2 dec_1 -r 1.00 -aa -o $7/$1$2-temp1.tbl -cw -nm2 > $7/gsa-$1$2-af.txt
-head -25 $5/$1$2_af.tbl > $7/$1$2-header-tmp.txt
+/Users/CatWISE/GSAdir/GSA/gsa -td $7 -t $7/$1$2.tbl -t $7/$1$2_af.tbl -ra1 ra -ra2 ra_1 -dec1 dec -dec2 dec_1 -r 1.00 -aa -o $7/$1$2-temp1.tbl -cw -nm2 > $7/gsa-$1$2-af.txt
+head -25 $7/$1$2_af.tbl > $7/$1$2-header-tmp.txt
 cat $7/$1$2-header-tmp.txt $7/$1$2-temp1.tbl > $9/$1$2-temp2.tbl
  
 mkdir -p $7/add-ab_flags_stdout/

@@ -6,7 +6,7 @@ echo
 echo Wrapper Started at:
 echo $startTime
 echo
-echo Version 1.7  1\) use \$5 in input list + input file  2\) added \-gsa 3\) make sure mdex and _af file path is different 4\) added rsync \(but not tested yet\!\!\!\) 
+echo Version 1.71 Fixed Output paths
 echo
 echo This Wrapper will wrap around and run:
 echo 1\) do-add-ab_flags
@@ -266,8 +266,8 @@ Mode3:
 	set RestOfTablename = `basename $afTableName | awk -v endIndex=$tempIndex '{print substr($0,9,endIndex)}'` 
 
 
-	set originalMdexTable = $mdexInputPath/${RadecID}${RestOfTablename}.tbl
-	set originalafTable = ${edited_afTableNamePATH}/${edited_afTableName}.tbl 
+	set originalMdexTable = ${OutputPath}/${RadecID}${RestOfTablename}.tbl
+	set originalafTable = ${OutputPath}/${edited_afTableName}.tbl 
 	echo "__________________________________________________________________________________________________"
         echo "Current input afTable = "$afTableName
         echo "Edited_Current input afTable = "$originalafTable
@@ -286,8 +286,8 @@ Mode3:
 	echo Unzipping ${afTableName} to ${originalafTable}
 	gunzip -f -c -k ${afTableName} > ${originalafTable}  # Unzip _af file
 
-	echo Unzipping ${originalMdexTable}.gz to ${originalMdexTable}
-	gunzip -f -c -k ${originalMdexTable}.gz > ${originalMdexTable}  # Unzip mdex file
+	echo Unzipping ${mdexInputPath}/${RadecID}${RestOfTablename}.tbl.gz to ${originalMdexTable}
+	gunzip -f -c -k ${mdexInputPath}/${RadecID}${RestOfTablename}.tbl.gz > ${originalMdexTable}  # Unzip mdex file
 	set saved_status = $? #Error Checking
        ### check exit status
         echo gunzip saved_status == ${saved_status}
