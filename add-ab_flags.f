@@ -1,6 +1,11 @@
 c   add-ab_flags  cloned from add-msk-col
 c   add-msk-col - cloned from SampleCols & add-opt1-cols
-c                 add msk column to an mdex filelumns for PowerSpectrum
+c                 add msk column to an mdex file
+c
+c   Note: this program uses wcslib to go from RA/Dec to pixel coords;
+c         as a result it can't build on Windows (wcslib won't build);
+c         perhaps wcslib could be eliminated and the pixel coords in
+c         the mdex file be used instead.
 c
 c vsn 1.0  B80810: initial version
 c     1.1  B80813: switched to 32-bit mask image (from 16-bit)
@@ -38,6 +43,7 @@ c                  changed ab_flags to upper case; copy ra & dec to
 c                  ra_pm and dec_pm when doing MaxDec fix
 c     2.0  B81220: removed all attempts to fix |Dec| > 90 problem (now
 c                  fixed in mrgad); defaulted DoMags to false.
+c     2.1  B81230: bullet-proofed for incompete CatWISE/IRSA matching
 c
 c=======================================================================
 c
@@ -70,23 +76,23 @@ c
      +               offscl, nNaN, nn11, nn12, nn21, nn22, kBadw3,
      +               kBadw4, kBad2w3, kBad2w4, kBadness, i1PSF, j1PSF,
      +               iPix, jPix, nPSF, i2PSF, j2PSF, n1Sat, n2Sat,
-     +               n1Cov, n2Cov, nEcl2Eq
+     +               n1Cov, n2Cov, src, src0, nIncomp
       Logical*4      NeedHelp, anynull, SanityChk, GoodXY1, GoodXY2,
      +               BitSet, dbg, OKhdr, useWCS, NaNwarn, NaNstat1,
      +               NaNpm1, NaNstat2, NaNpm2, doMags, doCov, GotN1,
-     +               GotN2, notWarndEcl
+     +               GotN2, ReadAlready
       Integer*4      nullval
       Integer*4, allocatable :: array1(:,:)
       Integer*2      cov1(2048,2048), cov2(2048,2048)
 c
-      Data Vsn/'2.0  B81220'/, nSrc/0/, nHead/0/, SanityChk/.true./,
+      Data Vsn/'2.1  B81230'/, nSrc/0/, nHead/0/, SanityChk/.true./,
      +     doMags/.false./, useWCS/.true./, NaNwarn/.false./,
      +     nn11,nn12,nn21,nn22/4*0/, w1m0,w2m0/2*22.5/, nPSF/2/,
      +     NeedHelp/.False./, MskBitHist/32*0/, dbg/.false./,
      +     notZero/0/, CoefMag/1.085736205d0/, w1mcor/0.145/,
      +     w2mcor/0.177/, kBadw3,kBadw4,kBad2w3,kBad2w4/4*0/,
-     +     doCov/.true./, GotN1,GotN2/2*.false./,
-     +     notWarndEcl/.true./, nEcl2Eq/0/
+     +     doCov/.true./, GotN1,GotN2/2*.false./, ReadAlready/.false./,
+     +     nIncomp/0/, nSrcHdr/-9/
 c
       Common / VDT / CDate, CTime, Vsn
 c
@@ -283,6 +289,7 @@ C  Any unit numbers allocated with FTGIOU must be freed with FTFIOU.
 c
 c - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 c                                      ! read in the W1 coverage file
+      if (.not.DoCov) go to 5
       call readFhead(Cov1Nam,Hfits)
       Call GetNAX(Cov1Nam,NCols,NRows,NPlanes,1,FileID1)
       if (dbg) print *,
@@ -329,9 +336,9 @@ c
 c
 c - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 c                                      ! Sanity Check
-      open (10, file = InFNam)
-5     read (10,'(a)', end = 3000) Line
-      if (Line(1:1) .eq. '\') go to 5
+5     open (10, file = InFNam)
+6     read (10,'(a)', end = 3000) Line
+      if (Line(1:1) .eq. '\') go to 6
       call GetFlds(Line,Field,IFa,IFb,NF)
       HdrLine = Line
       rewind(10)
@@ -373,9 +380,12 @@ c                                      ! filter out unwanted header lines
 10    read (10, '(a)', end=1000) Line
       if (Line(1:1) .eq. '\') then
         if (OKhdr(Line)) write(20,'(a)') Line(1:lnblnk(Line))
-        if (index(Line,'\Nsrc =') .gt. 0) then
+        if ((index(Line,'\Nsrc =') .gt. 0) .and. (nSrcHdr .lt. 0)) then
           n = index(Line,'=') + 1
           read (Line(n:lnblnk(Line)), *, err = 3002) nSrcHdr
+          write(20,'(a)') Line(1:lnblnk(Line))
+          if (dbg) print *,'Header \nSrc line: "'
+     +        //Line(1:lnblnk(Line))//'"'
         end if
         if (index(Line,'\DATETIME =') .gt. 0) then
           n = index(Line,'"') + 1
@@ -438,24 +448,32 @@ c                                      ! filter out unwanted header lines
         go to 10
       end if
 c
-      nSrc = nSrc + 1
+12    nSrc = nSrc + 1
       nNaN = index(Line,' NaN')
       if (nNaN .gt. 0) NaNwarn = .true.
 c
 c - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 c                                      ! check for multi-matches
-15    if (index(Line(IFa(401):IFb(401)),'null') .gt. 0) then   ! not multi
-        if (index(Line(IFa(385):IFb(385)),'null') .gt. 0) then ! no match
+15    if ((index(Line(IFa(401):IFb(401)),'null') .gt. 0) .or.
+     +    (index(Line(IFa(401):IFb(401)),'-999') .gt. 0)) then   ! not multi
+        if ((index(Line(IFa(385):IFb(385)),'null') .gt. 0) .or.
+     +      (index(Line(IFa(385):IFb(385)),'-999') .gt. 0)) then ! no match
           nAWstr = '    0'
-        else                                                   ! solo match
+          dist_str     = 'null'
+          cc_flags     = 'null'
+          w1cc_map     = 'null'
+          w1cc_map_str = 'null'
+          w2cc_map     = 'null'
+          w2cc_map_str = 'null'
+        else                                                     ! solo match
           nAWstr = '    1'
+          dist_str     = AdjustL(Line(IFa(385):IFb(385)))
+          cc_flags     = AdjustL(Line(Ifa(394):IFb(394)))
+          w1cc_map     = AdjustL(Line(Ifa(395):IFb(395)))
+          w1cc_map_str = AdjustL(Line(Ifa(396):IFb(396)))
+          w2cc_map     = AdjustL(Line(Ifa(397):IFb(397)))
+          w2cc_map_str = AdjustL(Line(Ifa(398):IFb(398)))
         end if
-        dist_str     = AdjustL(Line(IFa(385):IFb(385)))
-        cc_flags     = AdjustL(Line(Ifa(394):IFb(394)))
-        w1cc_map     = AdjustL(Line(Ifa(395):IFb(395)))
-        w1cc_map_str = AdjustL(Line(Ifa(396):IFb(396)))
-        w2cc_map     = AdjustL(Line(Ifa(397):IFb(397)))
-        w2cc_map_str = AdjustL(Line(Ifa(398):IFb(398)))
         if (dbg .and. (nSrc .lt. 5)) then
           print *,'nSrc:', nSrc
           print *,
@@ -474,6 +492,7 @@ c                                      ! check for multi-matches
         go to 100
       end if
 c                                 ! process multi-matches
+      read (Line(IFa(2):IFb(2))    , *, err = 3003) src0
       read (Line(IFa(401):IFb(401)), *, err = 3003) nAW
       write (nAWstr,'(i5)') nAW         ! note that w1cc_map and w2cc_map
       read (Line(IFa(395):Ifb(395)), *, err = 3004) w1ccmap  ! should never
@@ -486,8 +505,13 @@ c                                 ! process multi-matches
       kBadw4 = kBadness(w4cc)
 c
       do 20 n = 2, nAW
-        nSrc = nSrc + 1                ! increment for error msg only
         read (10, '(a)', end=3006) Line
+        read (Line(IFa(2):IFb(2)), *, err = 3003) src
+        if (src .ne. src0) then        ! Inconsistent Group; missing
+          ReadAlready = .true.         ! at least one member; assume
+          nIncomp = nIncomp + 1        ! members WOLD BE contiguous
+          go to 25                     ! in input stream
+        end if
         read (Line(IFa(395):Ifb(395)), *, err = 3004) w1ccmap2
         read (Line(IFa(397):Ifb(397)), *, err = 3005) w2ccmap2
         w1ccmap = IOr(w1ccmap, w1ccmap2)
@@ -510,8 +534,7 @@ c
           kBadw4 = kBad2w4
         end if
 20    continue
-      nSrc = nSrc - nAW + 1
-      write (dist_str,'(f8.5)') dist
+25    write (dist_str,'(f8.5)') dist
 30    if (lnblnk(dist_str) .lt. nw385) then
         dist_str = ' '//dist_str
         go to 30
@@ -1096,6 +1119,10 @@ c                                      ! compute w?cov and w?sat
       end if
 c                                      ! tweak ra & dec near poles
 900   write(20,'(a)') Line(1:lnblnk(line))
+      if (ReadAlready) then
+        ReadAlready = .false.
+        go to 12
+      end if
       go to 10
 c
 1000  print *,' No. data rows processed:', nSrc
@@ -1140,6 +1167,9 @@ c
         write (34,'(a,i5)') 'no. w2mpro_pm NaNs:            ', nn22
       end if
 c
+      if (nIncomp .gt. 0) print *,'No. of incomplete IRSA groups:',
+     +    nIncomp 
+c
       print *
       print *,'Mask Bit Counters:'
       do 1010 n = 1, 32
@@ -1159,7 +1189,10 @@ c
       print *,'       ',Line 
       call exit(64)
 c
-3003  print *,'ERROR: read error on GroupSize for source #', nSrc
+3003  print *,'ERROR: read error on src/src2/GroupSize for source #',
+     +         nSrc
+      print *,'             src field: "'//Line(IFa(2):IFb(2))//'"'
+      print *,'            src2 field: "'//Line(IFa(194):IFb(194))//'"'
       print *,'       GroupSize field: "'//Line(IFa(401):IFb(401))//'"'
       call exit(64)
 c
@@ -1524,7 +1557,7 @@ c
 c
 c-----------------------------------------------------------------------
 c
-      if (index(Line,'\Nsrc =')                       .gt. 0) go to 100
+c     if (index(Line,'\Nsrc =')                       .gt. 0) go to 100
       if (index(Line,'\ number of unWISE epochs eng') .gt. 0) go to 100
       if (index(Line,'\ bands engaged:   1  1  0  0') .gt. 0) go to 100     
       if (index(Line,'\ zero mags(band):  22.500 22') .gt. 0) go to 100 
