@@ -58,14 +58,12 @@ if ($# < 7) then
 else if ($1 == 2) then
 	set InputsList = $2
 	set versionID = $3
-        set mdexInputPath = $4
-        set af_InputPath = $5
-        set msk_InputPath = $6
-        set OutputPath = $7
+        set af_InputPath = $4
+        set msk_InputPath = $5
+        set OutputPath = $6
 
         echo Inputs list ==  $InputsList
 	echo versionID == $versionID
-        echo Mdex Input Path == $mdexInputPath
         echo af Input Path == $af_InputPath
         echo msk Input Path == $msk_InputPath
         echo Output Path == $OutputPath
@@ -74,12 +72,6 @@ else if ($1 == 2) then
         #if directories dont exist, throw error
         if(! -f $InputsList) then
                 echo ERROR: Input List file $InputsList does not exist.
-                echo
-                echo Exiting...
-                exit
-        endif
-        if(! -d $mdexInputPath) then
-                echo ERROR: Input Path directory $mdexInputPath does not exist.
                 echo
                 echo Exiting...
                 exit
@@ -109,17 +101,15 @@ else if ($1 == 2) then
 	goto Mode2
 #Mode3 Single Tile Mode
 else if ($1 == 3) then
-        set InputTable = $2
+        set TileID = $2
 	set versionID = $3
-        set mdexInputPath = $4
-        set af_InputPath = $5
-        set msk_InputPath = $6
-        set OutputPath = $7
+        set af_InputPath = $4
+        set msk_InputPath = $5
+        set OutputPath = $6
 	
 
-        echo Input _af Table name == $InputTable  # This is the input _af table name
+        echo Input _af Table name == $TileID
         echo versionID == $versionID
-        echo Mdex Input Path == $mdexInputPath
         echo af Input Path == $af_InputPath
         echo msk Input Path == $msk_InputPath
         echo Output Path == $OutputPath
@@ -134,7 +124,7 @@ else if ($1 == 3) then
 	if($withinMode2 == "true") then
 	echo "-withinMode2 set, running"
 	echo $withinMode2
-        	if(! -f $InputTable) then
+        	if(! -d $af_InputPath) then
 			echo
                 	echo ERROR: $InputTable doest not exist.
                 	echo
@@ -143,24 +133,15 @@ else if ($1 == 3) then
         	endif
 	else
 	echo "-withinMode2 NOT set, NOT running"
-        	if(! -f $af_InputPath/$InputTable) then
+        	if(! -d $af_InputPath) then
 			echo
-                	echo ERROR: $af_InputPath/$InputTable doest not exist.
+                	echo ERROR: $af_InputPath doest not exist.
                 	echo
                 	echo Exiting...
                 	exit
-        	else
-			set InputTable = $af_InputPath/$InputTable
-			echo NEW Input _af Table name == $InputTable
 		endif
 
 	endif
-        if(! -d $mdexInputPath) then
-                echo ERROR: Input Path directory $mdexInputPath does not exist.
-                echo
-                echo Exiting...
-                exit
-        endif
         if(! -d $msk_InputPath) then
                 echo ERROR: Input Path directory $msk_InputPath does not exist.
                 echo
@@ -196,27 +177,28 @@ endif
 
 Mode2:
     
-    foreach table (`cat $InputsList`)    
+    foreach tile (`cat $InputsList`)    
         echo ===================================== - START AddABWrapper wrapper loop iteration - ======================================
      
-        echo "Current input MDEXTable == "${table}
-        echo Calling addABWrapper.tcsh Mode3 on ${table}\: 
+        echo "Current input tile == "${tile}
+        echo Calling addABWrapper.tcsh Mode3 on ${tile}\:
+	
 	if($gsaSet == "true") then
 		if($rsyncSet == "true") then
-			echo "${wrapperDir}/addABWrapper.tcsh 3 $af_InputPath/$table $versionID $mdexInputPath $af_InputPath $msk_InputPath $OutputPath -rsync -gsa -withinMode2"
-			(echo y | ${wrapperDir}/addABWrapper.tcsh 3 $af_InputPath/$table $versionID $mdexInputPath $af_InputPath $msk_InputPath $OutputPath -rsync -gsa \
+			echo "${wrapperDir}/addABWrapper.tcsh 3 $tile $versionID $af_InputPath $msk_InputPath $OutputPath -rsync -gsa -withinMode2"
+			(echo y | ${wrapperDir}/addABWrapper.tcsh 3 $tile $versionID $af_InputPath $msk_InputPath $OutputPath -rsync -gsa \
 				-withinMode2) &
 		else
-			echo "${wrapperDir}/addABWrapper.tcsh 3 $af_InputPath/$table $versionID $mdexInputPath $af_InputPath $msk_InputPath $OutputPath -gsa -withinMode2"
-			(echo y | ${wrapperDir}/addABWrapper.tcsh 3 $af_InputPath/$table $versionID $mdexInputPath $af_InputPath $msk_InputPath $OutputPath -gsa -withinMode2) &
+			echo "${wrapperDir}/addABWrapper.tcsh 3 $tile $versionID $af_InputPath $msk_InputPath $OutputPath -gsa -withinMode2"
+			(echo y | ${wrapperDir}/addABWrapper.tcsh 3 $tile $versionID $af_InputPath $msk_InputPath $OutputPath -gsa -withinMode2) &
 		endif
 	else
 		if($rsyncSet == "true") then
-			echo "${wrapperDir}/addABWrapper.tcsh 3 $af_InputPath/$table $versionID $mdexInputPath $af_InputPath $msk_InputPath $OutputPath -rsync -withinMode2"
-			(echo y | ${wrapperDir}/addABWrapper.tcsh 3 $af_InputPath/$table $versionID $mdexInputPath $af_InputPath $msk_InputPath $OutputPath -rsync -withinMode2) &
+			echo "${wrapperDir}/addABWrapper.tcsh 3 $tile $versionID $af_InputPath $msk_InputPath $OutputPath -rsync -withinMode2"
+			(echo y | ${wrapperDir}/addABWrapper.tcsh 3 $tile $versionID $af_InputPath $msk_InputPath $OutputPath -rsync -withinMode2) &
 		else
-			echo "${wrapperDir}/addABWrapper.tcsh 3 $af_InputPath/$table $versionID $mdexInputPath $af_InputPath $msk_InputPath $OutputPath -withinMode2"
-			(echo y | ${wrapperDir}/addABWrapper.tcsh 3 $af_InputPath/$table $versionID $mdexInputPath $af_InputPath $msk_InputPath $OutputPath -withinMode2) &
+			echo "${wrapperDir}/addABWrapper.tcsh 3 $tile $versionID $af_InputPath $msk_InputPath $OutputPath -withinMode2"
+			(echo y | ${wrapperDir}/addABWrapper.tcsh 3 $tile $versionID $af_InputPath $msk_InputPath $OutputPath -withinMode2) &
 		endif
 	
 	endif
@@ -232,7 +214,7 @@ Mode2:
                 echo  Done waiting
         endif
 		echo
-                echo AddABWrapper for $table  done
+                echo AddABWrapper for $tile  done
             
             echo ====================================== - END AddABWrapper wrapper loop iteration - =======================================
     end
@@ -246,39 +228,74 @@ Mode2:
     goto Done
 
 Mode3:	
-       ###Given afTableName == /path/1497p015_opt1_20180609_083107.tbl.gz,
-        set afTableName = $InputTable 
-	set tempSize = `basename $afTableName  | awk '{print length($0)}'`
+    	#finding what machine we are running on
+	set currIP = `dig +short myip.opendns.com @resolver1.opendns.com`
+        echo current IP = $currIP
+
+       if($currIP == "137.78.30.21") then #Tyto
+        	set disk1 = "/Volumes/tyto1/CatWISE/"
+        	set disk2 = "/Volumes/tyto2/CatWISE/"
+		set disk3 = "/Volumes/CatWISE3/CatWISE/"
+        else if($currIP == "137.78.80.75") then  #Otus
+        	set disk1 = "/Volumes/otus1/CatWISE/"
+        	set disk2 = "/Volumes/otus2/CatWISE/"
+		set disk3 = "/Volumes/otus3/CatWISE/"
+	else if($currIP == "137.78.80.72") then #Athene
+        	set disk1 = "/Volumes/athene1/CatWISE/"
+        	set disk2 = "/Volumes/athene2/CatWISE/"
+		set disk3 = "/Volumes/athene3/CatWISE/"
+	endif
+
+	#finding most recent mdex table
+	set rarara = `echo $TileID | awk '{print substr($0,0,3)}'`
+
+	if ($rarara >= 0 && $rarara < 120) then
+	    set mdexInputPath = $disk1/$rarara/$TileID/Full/
+	endif
+
+	if ($rarara >= 120 && $rarara < 240) then
+	    set mdexInputPath = $disk2/$rarara/$TileID/Full/
+	endif
+
+	if ($rarara >= 240) then
+	    set mdexInputPath = $disk3/$rarara/$TileID/Full/
+	endif
+	
+	set mdexTable = `ls -dtr1 $mdexInputPath/$TileID*opt*tbl.gz | tail -1`
+
+	#finding most recent af file
+	set afTableName = `ls -dtr1 $af_InputPath/$TileID*tbl.gz | tail -1`
+	
+	set tempSize = `basename $mdexTable | awk '{print length($0)}'`
         @ tempIndex = ($tempSize - 3 - 4) 
        ### tempIndex = filesize - sizeof(".gz") - sizeof(".tbl")
 
-       ### Given afTableName = 		1497p015_opt1_20180609_083107.tbl.gz,
+       ### Given mdexTable = 		1497p015_opt1_20180609_083107.tbl.gz,
        ###  edited_afTableName = 	1497p015_opt1_20180609_083107
        ###  edited_afTableNamePATH =	# full path that the afTable resides in
        ###  RadecID = 			1497015
        ###  RestOfTablename = 		_opt1_20180609_083107
+        set edited_mdexTableName = `basename $mdexTable | awk -v endIndex=$tempIndex '{print substr($0,0,endIndex)}'`
+	@ tempIndex = ($tempIndex - 8)
+	set RestOfTablename = `basename $mdexTable | awk -v endIndex=$tempIndex '{print substr($0,9,endIndex)}'`
+
+	set tempSize = `basename $afTableName | awk '{print length($0)}'`
+        @ tempIndex = ($tempSize - 3 - 4) 	
         set edited_afTableName = `basename $afTableName | awk -v endIndex=$tempIndex '{print substr($0,0,endIndex)}'`
-        set edit_afTableNamePATH = $af_InputPath
-	set edited_afTableNamePATH = `cd $edit_afTableNamePATH && pwd`
-	set RadecID = `basename $afTableName | awk '{print substr($0,0,8)}'`
-        ### tempIndex = tempIndex - sizeof($RadecID) - sizeof("_af")
-	@ tempIndex = ($tempIndex - 8 - 3)
-	set RestOfTablename = `basename $afTableName | awk -v endIndex=$tempIndex '{print substr($0,9,endIndex)}'` 
 
-
-	set originalMdexTable = ${OutputPath}/${RadecID}${RestOfTablename}.tbl
+	set originalmdexTable = ${OutputPath}/${edited_mdexTableName}.tbl
 	set originalafTable = ${OutputPath}/${edited_afTableName}.tbl 
 	echo "__________________________________________________________________________________________________"
         echo "Current input afTable = "$afTableName
         echo "Edited_Current input afTable = "$originalafTable
-        echo "RadecID = "$RadecID
+        echo "RadecID = "$TileID
 	echo "RestOfTablename = "$RestOfTablename
 	echo "versionID = "${versionID}
 	echo "mdexInputPath = "${mdexInputPath}
 	echo "af_InputPath = "${af_InputPath}
 	echo "msk_InputPath = "${msk_InputPath}
 	echo "OutputPath  = "${OutputPath}
-	echo "originalMdexTable = ${originalMdexTable}"
+	echo "originalmdexTable = "${originalmdexTable}
 	echo "__________________________________________________________________________________________________\n"
 	
 	#TODO December 20 11:18 look at the mdex logic
@@ -286,13 +303,13 @@ Mode3:
 	echo Unzipping ${afTableName} to ${originalafTable}
 	gunzip -f -c -k ${afTableName} > ${originalafTable}  # Unzip _af file
 
-	echo Unzipping ${mdexInputPath}/${RadecID}${RestOfTablename}.tbl.gz to ${originalMdexTable}
-	gunzip -f -c -k ${mdexInputPath}/${RadecID}${RestOfTablename}.tbl.gz > ${originalMdexTable}  # Unzip mdex file
+	echo Unzipping ${mdexTable} to ${originalmdexTable}
+	gunzip -f -c -k ${mdexTable} > ${originalmdexTable}  # Unzip mdex file
 	set saved_status = $? #Error Checking
        ### check exit status
         echo gunzip saved_status == ${saved_status}
         if($saved_status != 0) then #if program failed, status != 0
-                echo Failure detected on tile ${RadecID}
+                echo Failure detected on tile ${TileID}
                 set failedProgram = "gunzip"
                 goto Failed
         endif
@@ -301,7 +318,7 @@ Mode3:
 
        ### John Fowler's Single Tile program
 	echo Preparing inputs \$8 \(-n-m files path\) and \$9\(temp2 files path\) for do-ab.tcsh
-	set ra = `echo ${RadecID} | awk '{print substr($0,0,3)}'`
+	set ra = `echo ${TileID} | awk '{print substr($0,0,3)}'`
 	echo ra == $ra
 
 	set n_m_path = ""
@@ -309,13 +326,13 @@ Mode3:
 	set currIP = `dig +short myip.opendns.com @resolver1.opendns.com`
         echo current IP = $currIP
         if($currIP == "137.78.30.21") then #Tyto
-        	set n_m_path = "/Volumes/tyto2/UnWISE/${ra}/${RadecID}"
+        	set n_m_path = "/Volumes/tyto2/UnWISE/${ra}/${TileID}"
 		set temp2_path = "/Volumes/tyto1/Ab_files_v1"
         else if($currIP == "137.78.80.75") then  #Otus
-        	set n_m_path = "/Volumes/otus1/UnWISE/${ra}/${RadecID}"
+        	set n_m_path = "/Volumes/otus1/UnWISE/${ra}/${TileID}"
 		set temp2_path = "/Volumes/otus5/Ab_files_v1"
 	else if($currIP == "137.78.80.72") then #Athene
-        	set n_m_path = "/Volumes/athene3/UnWISE/${ra}/${RadecID}"
+        	set n_m_path = "/Volumes/athene3/UnWISE/${ra}/${TileID}"
 		set temp2_path = "/Volumes/athene5/Ab_files_v1"
 	endif
 	echo "n_m_path = "${n_m_path}
@@ -325,19 +342,19 @@ Mode3:
 
         	### Program call
 		echo John Fowler Program call:
-      		echo "${wrapperDir}/do-ab_gsa.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${mdexInputPath} ${af_InputPath} ${msk_InputPath} ${OutputPath} ${n_m_path} ${temp2_path} \n" 
-		${wrapperDir}/do-ab_gsa.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${mdexInputPath} ${af_InputPath} ${msk_InputPath} ${OutputPath} ${n_m_path} ${temp2_path}
+      		echo "${wrapperDir}/do-ab_gsa.tcsh ${TileID} ${RestOfTablename} ${originalmdexTable} ${originalafTable} ${versionID} ${mdexInputPath} ${af_InputPath} ${msk_InputPath} ${OutputPath} ${n_m_path} \n" 
+		${wrapperDir}/do-ab_gsa.tcsh ${TileID} ${RestOfTablename} ${originalmdexTable} ${originalafTable} ${versionID} ${mdexInputPath} ${af_InputPath} ${msk_InputPath} ${OutputPath} ${n_m_path}
 	else
         	### Program call
 		echo John Fowler Program call:
-      		echo "${wrapperDir}/do-ab_NOgsa.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${mdexInputPath} ${af_InputPath} ${msk_InputPath} ${OutputPath} ${n_m_path} ${temp2_path} \n" 
-		${wrapperDir}/do-ab_NOgsa.tcsh ${RadecID} ${RestOfTablename} ${versionID} ${mdexInputPath} ${af_InputPath} ${msk_InputPath} ${OutputPath} ${n_m_path} ${temp2_path}
+      		echo "${wrapperDir}/do-ab_NOgsa.tcsh ${TileID} ${RestOfTablename} ${originalmdexTable} ${originalafTable} ${versionID} ${mdexInputPath} ${af_InputPath} ${msk_InputPath} ${OutputPath} ${n_m_path} ${temp2_path} \n" 
+		${wrapperDir}/do-ab_NOgsa.tcsh ${TileID} ${RestOfTablename} ${originalmdexTable} ${originalafTable} ${versionID} ${mdexInputPath} ${af_InputPath} ${msk_InputPath} ${OutputPath} ${n_m_path} ${temp2_path}
 	endif
 	set saved_status = $? 
 	#check exit status
-	echo stils saved_status == $saved_status 
+	echo saved_status == $saved_status 
 	if($saved_status != 0) then #if program failed, status != 0
-		echo Failure detected on tile $RadecID
+		echo Failure detected on tile $TileID
 		set failedProgram = "do-add-ab_flags.tcsh"
 		goto Failed
 	endif
@@ -355,14 +372,14 @@ exit
 
 #Done section for gzipping rsyncing
 Mode3_Done:
-echo DONE. Output: ${edited_afTableNamePATH}/${edited_afTableName}_ab.tbl 
-echo AddABWrapper on ${RadecID} Mode: ${1} Done
+echo DONE. Output: ${OutputPath}/${TileID}${RestOfTablename}_ab.tbl 
+echo AddABWrapper on ${TileID} Mode: ${1} Done
 set endTime = `date '+%m/%d/%Y %H:%M:%S'`
 echo "rm  ${originalafTable}"
-echo "rm  ${originalMdexTable}"
+echo "rm  ${originalmdexTable}"
 #rm af file and rm original mdex table
 rm  ${originalafTable}
-rm  ${originalMdexTable}
+rm  ${originalmdexTable}
 #TODO:
 # change arguments to 3 input directories:
 # ab_masks, af, mdex tables,
@@ -373,7 +390,7 @@ echo
 	if($rsyncSet == "true") then
        #rsync output dir from Current server to other 2 servers (Tyto, Otus, Athene)
 	set CatWISEDir = ${OutputPath}
-        echo running rsync on tile $RadecID
+        echo running rsync on tile $TileID
         set currIP = `dig +short myip.opendns.com @resolver1.opendns.com`
         echo current IP = $currIP
         if($currIP == "137.78.30.21") then #Tyto
