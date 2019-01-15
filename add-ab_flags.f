@@ -43,7 +43,8 @@ c                  changed ab_flags to upper case; copy ra & dec to
 c                  ra_pm and dec_pm when doing MaxDec fix
 c     2.0  B81220: removed all attempts to fix |Dec| > 90 problem (now
 c                  fixed in mrgad); defaulted DoMags to false.
-c     2.1  B81230: bullet-proofed for incompete CatWISE/IRSA matching
+c     2.1  B81230: bullet-proofed for incomplete CatWISE/IRSA matching
+c     2.2  B90114: added -999.0 clipping for w?snr; set DoMags back to T
 c
 c=======================================================================
 c
@@ -85,8 +86,8 @@ c
       Integer*4, allocatable :: array1(:,:)
       Integer*2      cov1(2048,2048), cov2(2048,2048)
 c
-      Data Vsn/'2.1  B81230'/, nSrc/0/, nHead/0/, SanityChk/.true./,
-     +     doMags/.false./, useWCS/.true./, NaNwarn/.false./,
+      Data Vsn/'2.2  B90114'/, nSrc/0/, nHead/0/, SanityChk/.true./,
+     +     doMags/.true./, useWCS/.true./, NaNwarn/.false./,
      +     nn11,nn12,nn21,nn22/4*0/, w1m0,w2m0/2*22.5/, nPSF/2/,
      +     NeedHelp/.False./, MskBitHist/32*0/, dbg/.false./,
      +     notZero/0/, CoefMag/1.085736205d0/, w1mcor/0.145/,
@@ -696,6 +697,7 @@ c
           read (Line(Ifa(23):Ifb(23)), *, err=333) sigflux
           wsnr = flux/sigflux
           if (wsnr .gt. 9999.0) wsnr = 9999.0
+          if (wsnr .lt. -999.0) wsnr = -999.0
           write (Line(IFA(20):IFB(20)), '(F7.1)') wsnr
           if ((flux .gt. 0.0d0) .and. (wsnr .ge. 2.0d0)) then
             mag    = w1m0 - 2.5*dlog10(flux)
@@ -725,6 +727,7 @@ c
           read (Line(Ifa(25):Ifb(25)), *, err=333) sigflux
           wsnr = flux/sigflux
           if (wsnr .gt. 9999.0) wsnr = 9999.0
+          if (wsnr .lt. -999.0) wsnr = -999.0
           write (Line(IFA(21):IFB(21)), '(F7.1)') wsnr
           if ((flux .gt. 0.0d0) .and. (wsnr .ge. 2.0d0)) then
             mag    = w2m0 - 2.5*dlog10(flux)
@@ -754,6 +757,7 @@ c
           read (Line(Ifa(153):Ifb(153)), *, err=333) sigflux
           wsnr = flux/sigflux
           if (wsnr .gt. 9999.0) wsnr = 9999.0
+          if (wsnr .lt. -999.0) wsnr = -999.0
           write (Line(IFA(150):IFB(150)), '(f9.1)') wsnr
           if ((flux .gt. 0.0d0) .and. (wsnr .ge. 2.0d0)) then
             mag    = w1m0 - 2.5*dlog10(flux)
@@ -783,6 +787,7 @@ c
           read (Line(Ifa(155):Ifb(155)), *, err=333) sigflux
           wsnr = flux/sigflux
           if (wsnr .gt. 9999.0) wsnr = 9999.0
+          if (wsnr .lt. -999.0) wsnr = -999.0
           write (Line(IFA(151):IFB(151)), '(F9.1)') wsnr
           if ((flux .gt. 0.0d0) .and. (wsnr .ge. 2.0d0)) then
             mag    = w2m0 - 2.5*dlog10(flux)
