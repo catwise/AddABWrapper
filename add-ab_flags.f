@@ -27,7 +27,7 @@ c     1.8  B80930: added file output to warn if nSrc mismatch
 c     1.9  B81005: added alarm/band-aid fix for NaNs in w?mpro &c.
 c     1.91 B81005: added counters for NaN combinations
 c     1.92 B81101: added option to recompute magnitudes from fluxes
-c     1.93 B81103: addedmany debug checkpoints to trace NaNs
+c     1.93 B81103: added many debug checkpoints to trace NaNs
 c     1.94 B81105: removed NaN debugging and band-aid NaN fix
 c     1.95 B81106: added "pipe" table header conversion to "double" for
 c                  ra, dec, MJDs, elon, & elat
@@ -45,6 +45,7 @@ c     2.0  B81220: removed all attempts to fix |Dec| > 90 problem (now
 c                  fixed in mrgad); defaulted DoMags to false.
 c     2.1  B81230: bullet-proofed for incomplete CatWISE/IRSA matching
 c     2.2  B90114: added -999.0 clipping for w?snr; set DoMags back to T
+c     2.3  B90118: added checking for non-blank characters under "pipes"
 c
 c=======================================================================
 c
@@ -53,10 +54,11 @@ c
 c
       character*150000 Hfits
       Character*5000 Line, HdrLine
-      Character*500  InFNam, MskNam, OutFNam, NLNam, Cov1Nam, Cov2Nam
+      Character*500  InFNam, MskNam, OutFNam, NLNam, Cov1Nam, Cov2Nam,
+     +               ErrNam 
       Character*50   w1cc_map_str, w2cc_map_str, cc_flags, w1cc_map,
      +               w2cc_map, dist_str
-      Character*25   Field(MaxFld)
+      Character*25   Field(MaxFld), Field2(MaxFld)
       Character*13   w1ab_map_str, w2ab_map_str
       Character*11   Vsn, NumStr
       Character*9    ab_flags, w1ab_map, w2ab_map
@@ -77,7 +79,8 @@ c
      +               offscl, nNaN, nn11, nn12, nn21, nn22, kBadw3,
      +               kBadw4, kBad2w3, kBad2w4, kBadness, i1PSF, j1PSF,
      +               iPix, jPix, nPSF, i2PSF, j2PSF, n1Sat, n2Sat,
-     +               n1Cov, n2Cov, src, src0, nIncomp
+     +               n1Cov, n2Cov, src, src0, nIncomp, IFa2(MaxFld),
+     +               IFb2(MaxFld), NF2, nUnderPipe
       Logical*4      NeedHelp, anynull, SanityChk, GoodXY1, GoodXY2,
      +               BitSet, dbg, OKhdr, useWCS, NaNwarn, NaNstat1,
      +               NaNpm1, NaNstat2, NaNpm2, doMags, doCov, GotN1,
@@ -86,14 +89,14 @@ c
       Integer*4, allocatable :: array1(:,:)
       Integer*2      cov1(2048,2048), cov2(2048,2048)
 c
-      Data Vsn/'2.2  B90114'/, nSrc/0/, nHead/0/, SanityChk/.true./,
+      Data Vsn/'2.3  B90118'/, nSrc/0/, nHead/0/, SanityChk/.true./,
      +     doMags/.true./, useWCS/.true./, NaNwarn/.false./,
      +     nn11,nn12,nn21,nn22/4*0/, w1m0,w2m0/2*22.5/, nPSF/2/,
      +     NeedHelp/.False./, MskBitHist/32*0/, dbg/.false./,
      +     notZero/0/, CoefMag/1.085736205d0/, w1mcor/0.145/,
      +     w2mcor/0.177/, kBadw3,kBadw4,kBad2w3,kBad2w4/4*0/,
      +     doCov/.true./, GotN1,GotN2/2*.false./, ReadAlready/.false./,
-     +     nIncomp/0/, nSrcHdr/-9/
+     +     nIncomp/0/, nSrcHdr/-9/, nUnderPipe/0/
 c
       Common / VDT / CDate, CTime, Vsn
 c
@@ -122,6 +125,8 @@ c
         print *,'The OPTIONAL flags are:'
         print *,'    -n1 name of a W1 "-n-" coverage image'
         print *,'    -n2 name of a W2 "-n-" coverage image'
+        print *,'    -m0 turn off magnitude recomputation'
+        print *,'    -m1 turn on magnitude recomputation'
         print *,'    -n  name of an abflagin namelist file'
         print *,'    -d  (enable debug mode)'
         Print *
@@ -153,6 +158,14 @@ c                                      ! Turn debug prints on
       else if (Flag .eq. '-D') then
         dbg = .true.
         print *,'Debug prints enabled'
+c                                      ! Turn magnitude recomputation off
+      else if (Flag .eq. '-M0') then
+        DoMags = .false.
+        if (dbg) print *,'magnitude recomputation off'
+c                                      ! Turn magnitude recomputation on
+      else if (Flag .eq. '-M1') then
+        DoMags = .true.
+        if (dbg) print *,'magnitude recomputation on'
 c
       else if (Flag .eq. '-M') then
         call NextNarg(NArg,Nargs)
@@ -405,6 +418,7 @@ c                                      ! filter out unwanted header lines
      +   //'n_aw|ab_flags|w1ab_map|w1ab_map_str|w2ab_map|w2ab_map_str|'
           write(20,'(a)') Line(1:lnblnk(Line))
           HdrLine = Line
+          call GetFlds(HdrLine,Field2,IFa2,IFb2,NF2)  ! for "under-pipe" check
         end if
         if (nHead .eq. 2) write(20,'(a)') '|       char             '
      +   //'|   i  |  double   |  double   |   r    |   r    |    r   '
@@ -1122,15 +1136,40 @@ c                                      ! compute w?cov and w?sat
         wcov = float(n2Cov)/float(nPix)
         write(Line(IFA(48):IFb(48)),'(f8.1)') wcov
       end if
-c                                      ! tweak ra & dec near poles
+c                                      ! check for data under pipe
 900   write(20,'(a)') Line(1:lnblnk(line))
+      do 920 j = 1, NF2
+        if (Line(IFa2(j):IFa2(j)) .ne. ' ') then
+          nUnderPipe = nUnderPipe + 1
+          if (nUnderPipe .eq. 1) then
+            ErrNam = InfNam
+910         n = index(ErrNam,'/')
+            if (n .gt. 0) then
+              do 915 i = 1, n
+                ErrNam(i:i) = ' '
+915           continue
+              go to 910
+            end if
+            ErrNam = AdjustL(ErrNam)
+            open (31, file = 'ERROR_MESSAGE-DATA_UNDER_PIPE-'
+     +                     //InFNam(1:lnblnk(InFNam))//'.txt')
+          end if
+          write (31,'(a,i4,a,i6)') 'ERROR: data found under a pipe for column ',
+     +                    j, ' output row ', nSrc
+          write(31,'(a)') HdrLine(IFa2(j):Ifb2(j))//'|'
+          write(31,'(a)') Line(IFa2(j):Ifb2(j))         
+        end if
+920   continue
       if (ReadAlready) then
         ReadAlready = .false.
         go to 12
       end if
       go to 10
 c
-1000  print *,' No. data rows processed:', nSrc
+1000  print *,' No. data rows processed:   ', nSrc
+c
+      if (nUnderPipe .gt. 0) print *,' No. data-under-pipe errors:',
+     +    nUnderPipe
 c
       if (nSrc .ne. nSrcHdr) then
         print *,
@@ -1138,7 +1177,7 @@ c
 1001    n = index(InFNam,'/')
         if (n .gt. 0) then
           do 1002 i = 1, n
-          InFNam(i:i) = ' '
+            InFNam(i:i) = ' '
 1002      continue
           go to 1001
         end if
