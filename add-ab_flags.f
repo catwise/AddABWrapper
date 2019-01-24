@@ -2,11 +2,6 @@ c   add-ab_flags  cloned from add-msk-col
 c   add-msk-col - cloned from SampleCols & add-opt1-cols
 c                 add msk column to an mdex file
 c
-c   Note: this program uses wcslib to go from RA/Dec to pixel coords;
-c         as a result it can't build on Windows (wcslib won't build);
-c         perhaps wcslib could be eliminated and the pixel coords in
-c         the mdex file be used instead.
-c
 c vsn 1.0  B80810: initial version
 c     1.1  B80813: switched to 32-bit mask image (from 16-bit)
 c     1.2  B80814: added processing of bits 21 and 22
@@ -46,6 +41,9 @@ c                  fixed in mrgad); defaulted DoMags to false.
 c     2.1  B81230: bullet-proofed for incomplete CatWISE/IRSA matching
 c     2.2  B90114: added -999.0 clipping for w?snr; set DoMags back to T
 c     2.3  B90118: added checking for non-blank characters under "pipes"
+c     2.4  B90124: added table header lines identifying version, date
+c                  and time of run, and mask used; removed "cleanup"
+c                  and "equinox" from header pass-through, added "mrgad"
 c
 c=======================================================================
 c
@@ -89,7 +87,7 @@ c
       Integer*4, allocatable :: array1(:,:)
       Integer*2      cov1(2048,2048), cov2(2048,2048)
 c
-      Data Vsn/'2.3  B90118'/, nSrc/0/, nHead/0/, SanityChk/.true./,
+      Data Vsn/'2.4  B90124'/, nSrc/0/, nHead/0/, SanityChk/.true./,
      +     doMags/.true./, useWCS/.true./, NaNwarn/.false./,
      +     nn11,nn12,nn21,nn22/4*0/, w1m0,w2m0/2*22.5/, nPSF/2/,
      +     NeedHelp/.False./, MskBitHist/32*0/, dbg/.false./,
@@ -126,7 +124,7 @@ c
         print *,'    -n1 name of a W1 "-n-" coverage image'
         print *,'    -n2 name of a W2 "-n-" coverage image'
         print *,'    -m0 turn off magnitude recomputation'
-        print *,'    -m1 turn on magnitude recomputation'
+        print *,'    -m1 turn on magnitude recomputation (default)'
         print *,'    -n  name of an abflagin namelist file'
         print *,'    -d  (enable debug mode)'
         Print *
@@ -414,6 +412,10 @@ c                                      ! filter out unwanted header lines
      +   //Line(IFa(394):IFb(398))//'|'
         nHead = nHead + 1
         if (nHead .eq. 1) then
+          write(20,'(a)') '\ add-ab_flags vsn '//Vsn//' run on '
+     +                  //CDate//' at '//CTime
+          write(20,'(a)') '\ artifact bitmasks from '
+     +                  //MskNam(1:LNBlnk(MskNam))
           Line = Line(1:lnblnk(Line))
      +   //'n_aw|ab_flags|w1ab_map|w1ab_map_str|w2ab_map|w2ab_map_str|'
           write(20,'(a)') Line(1:lnblnk(Line))
@@ -1610,8 +1612,9 @@ c     if (index(Line,'\Nsrc =')                       .gt. 0) go to 100
       if (index(Line,'\ band =  1  circ apertures R') .gt. 0) go to 100 
       if (index(Line,'\ band =  2  circ apertures R') .gt. 0) go to 100 
       if (index(Line,'\ MJD0 = ')                     .gt. 0) go to 100
-      if (index(Line,'\ cleanup vsn')                 .gt. 0) go to 100
-      if (index(Line,'\EQUINOX = "J2000"')            .gt. 0) go to 100
+c     if (index(Line,'\ cleanup vsn')                 .gt. 0) go to 100
+c     if (index(Line,'\EQUINOX = "J2000"')            .gt. 0) go to 100
+      if (index(Line,'\ mrgad vsn')                   .gt. 0) go to 100
 c
       OKhdr = .false.
       return
