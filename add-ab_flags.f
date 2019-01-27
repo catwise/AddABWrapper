@@ -44,6 +44,7 @@ c     2.3  B90118: added checking for non-blank characters under "pipes"
 c     2.4  B90124: added table header lines identifying version, date
 c                  and time of run, and mask used; removed "cleanup"
 c                  and "equinox" from header pass-through, added "mrgad"
+c     2.5  B90127: changed handling of input headers; set DoMags=F
 c
 c=======================================================================
 c
@@ -80,21 +81,21 @@ c
      +               n1Cov, n2Cov, src, src0, nIncomp, IFa2(MaxFld),
      +               IFb2(MaxFld), NF2, nUnderPipe
       Logical*4      NeedHelp, anynull, SanityChk, GoodXY1, GoodXY2,
-     +               BitSet, dbg, OKhdr, useWCS, NaNwarn, NaNstat1,
+     +               BitSet, dbg, useWCS, NaNwarn, NaNstat1,
      +               NaNpm1, NaNstat2, NaNpm2, doMags, doCov, GotN1,
-     +               GotN2, ReadAlready
+     +               GotN2, ReadAlready, GotEndHdr1
       Integer*4      nullval
       Integer*4, allocatable :: array1(:,:)
       Integer*2      cov1(2048,2048), cov2(2048,2048)
 c
-      Data Vsn/'2.4  B90124'/, nSrc/0/, nHead/0/, SanityChk/.true./,
-     +     doMags/.true./, useWCS/.true./, NaNwarn/.false./,
+      Data Vsn/'2.5  B90127'/, nSrc/0/, nHead/0/, SanityChk/.true./,
+     +     doMags/.false./, useWCS/.true./, NaNwarn/.false./,
      +     nn11,nn12,nn21,nn22/4*0/, w1m0,w2m0/2*22.5/, nPSF/2/,
      +     NeedHelp/.False./, MskBitHist/32*0/, dbg/.false./,
      +     notZero/0/, CoefMag/1.085736205d0/, w1mcor/0.145/,
      +     w2mcor/0.177/, kBadw3,kBadw4,kBad2w3,kBad2w4/4*0/,
      +     doCov/.true./, GotN1,GotN2/2*.false./, ReadAlready/.false./,
-     +     nIncomp/0/, nSrcHdr/-9/, nUnderPipe/0/
+     +     nIncomp/0/, nSrcHdr/-9/, nUnderPipe/0/, GotEndHdr1/.false./
 c
       Common / VDT / CDate, CTime, Vsn
 c
@@ -391,11 +392,11 @@ c
 c                                      ! filter out unwanted header lines
 10    read (10, '(a)', end=1000) Line
       if (Line(1:1) .eq. '\') then
-        if (OKhdr(Line)) write(20,'(a)') Line(1:lnblnk(Line))
+        if (index(Line,'"Joined"') .gt. 0) GotEndHdr1 = .true.
+        if (.not.GotEndHdr1) write(20,'(a)') Line(1:lnblnk(Line))
         if ((index(Line,'\Nsrc =') .gt. 0) .and. (nSrcHdr .lt. 0)) then
           n = index(Line,'=') + 1
           read (Line(n:lnblnk(Line)), *, err = 3002) nSrcHdr
-          write(20,'(a)') Line(1:lnblnk(Line))
           if (dbg) print *,'Header \nSrc line: "'
      +        //Line(1:lnblnk(Line))//'"'
         end if
@@ -405,8 +406,10 @@ c                                      ! filter out unwanted header lines
      +         //' arcsec radius on '//Line(n:n+18)
           write(20,'(a)') Line(1:lnblnk(Line))
         end if
+        if (index(Line,'\ mrgad vsn') .gt. 0) GotEndHdr1 = .true.
         go to 10
       end if
+c
       if (Line(1:1) .eq. '|') then
         Line =    Line(1:Ifb(191))//Line(IFa(385):IFb(385))
      +   //Line(IFa(394):IFb(398))//'|'
@@ -1593,36 +1596,6 @@ C-----------------------------------------------------------------------
 6001  Format('         This is the last warning that will be printed')
 C-----------------------------------------------------------------------
       End
-c
-c=======================================================================
-c
-      function OKhdr(Line)
-c
-      Character*5000 Line
-      logical*4 OKhdr
-c
-c-----------------------------------------------------------------------
-c
-c     if (index(Line,'\Nsrc =')                       .gt. 0) go to 100
-      if (index(Line,'\ number of unWISE epochs eng') .gt. 0) go to 100
-      if (index(Line,'\ bands engaged:   1  1  0  0') .gt. 0) go to 100     
-      if (index(Line,'\ zero mags(band):  22.500 22') .gt. 0) go to 100 
-      if (index(Line,'\ band =  1  standard Rap(ban') .gt. 0) go to 100 
-      if (index(Line,'\ band =  2  standard Rap(ban') .gt. 0) go to 100 
-      if (index(Line,'\ band =  1  circ apertures R') .gt. 0) go to 100 
-      if (index(Line,'\ band =  2  circ apertures R') .gt. 0) go to 100 
-      if (index(Line,'\ MJD0 = ')                     .gt. 0) go to 100
-c     if (index(Line,'\ cleanup vsn')                 .gt. 0) go to 100
-c     if (index(Line,'\EQUINOX = "J2000"')            .gt. 0) go to 100
-      if (index(Line,'\ mrgad vsn')                   .gt. 0) go to 100
-c
-      OKhdr = .false.
-      return
-c
-100   OKhdr = .true.
-      return
-c
-      end
 c
 c=======================================================================
 c
