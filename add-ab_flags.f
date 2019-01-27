@@ -124,8 +124,8 @@ c
         print *,'The OPTIONAL flags are:'
         print *,'    -n1 name of a W1 "-n-" coverage image'
         print *,'    -n2 name of a W2 "-n-" coverage image'
-        print *,'    -m0 turn off magnitude recomputation'
-        print *,'    -m1 turn on magnitude recomputation (default)'
+        print *,'    -m0 turn off magnitude recomputation (default)'
+        print *,'    -m1 turn on magnitude recomputation'
         print *,'    -n  name of an abflagin namelist file'
         print *,'    -d  (enable debug mode)'
         Print *
