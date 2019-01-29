@@ -15,7 +15,7 @@ echo NOTICE: SKIPPING gsa call!
 
 mkdir -p $7/add-ab_flags_stdout/
 echo "/Users/CatWISE/AddABflags/Add-ab_flags/add-ab_flags -i $9/$1$2-temp2.tbl -m $7/unwise-$1-msk.fits -o $7/$1$2_ab_$3.tbl -n1 $8/unwise-$1-w1-n-m.fits -n2 $8/unwise-$1-w2-n-m.fits > $7/add-ab_flags_stdout/ab-$1$2_$3.txt"
-/Users/CatWISE/AddABflags/Add-ab_flags/add-ab_flags -i $9/$1$2-temp2.tbl -m $7/unwise-$1-msk.fits -o $7/$1$2_ab_$3.tbl -n1 $7/unwise-$1-w1-n-m.fits -n2 $7/unwise-$1-w2-n-m.fits > $7/add-ab_flags_stdout/ab-$1$2_$3.txt
+/Volumes/CatWISE1/jwf/src/add-ab_flags -i $9/$1$2-temp2.tbl -m $7/unwise-$1-msk.fits -o $7/$1$2_ab_$3.tbl -n1 $7/unwise-$1-w1-n-m.fits -n2 $7/unwise-$1-w2-n-m.fits > $7/add-ab_flags_stdout/ab-$1$2_$3.txt
 
  
 rm $9/$1$2-temp2.tbl
