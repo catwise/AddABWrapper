@@ -45,6 +45,7 @@ c     2.4  B90124: added table header lines identifying version, date
 c                  and time of run, and mask used; removed "cleanup"
 c                  and "equinox" from header pass-through, added "mrgad"
 c     2.5  B90127: changed handling of input headers; set DoMags=F
+c     2.6  B90204: fixed bug in ERROR_DATA_UNDER_PIPR file name
 c
 c=======================================================================
 c
@@ -88,7 +89,7 @@ c
       Integer*4, allocatable :: array1(:,:)
       Integer*2      cov1(2048,2048), cov2(2048,2048)
 c
-      Data Vsn/'2.5  B90127'/, nSrc/0/, nHead/0/, SanityChk/.true./,
+      Data Vsn/'2.6  B90204'/, nSrc/0/, nHead/0/, SanityChk/.true./,
      +     doMags/.false./, useWCS/.true./, NaNwarn/.false./,
      +     nn11,nn12,nn21,nn22/4*0/, w1m0,w2m0/2*22.5/, nPSF/2/,
      +     NeedHelp/.False./, MskBitHist/32*0/, dbg/.false./,
@@ -1157,12 +1158,16 @@ c                                      ! check for data under pipe
             end if
             ErrNam = AdjustL(ErrNam)
             open (31, file = 'ERROR_MESSAGE-DATA_UNDER_PIPE-'
-     +                     //InFNam(1:lnblnk(InFNam))//'.txt')
+     +                     //ErrNam(1:lnblnk(ErrNam))//'.txt')
           end if
           write (31,'(a,i4,a,i6)') 'ERROR: data found under a pipe for column ',
      +                    j, ' output row ', nSrc
           write(31,'(a)') HdrLine(IFa2(j):Ifb2(j))//'|'
           write(31,'(a)') Line(IFa2(j):Ifb2(j))         
+          write (6,'(a,i4,a,i6)') 'ERROR: data found under a pipe for column ',
+     +                    j, ' output row ', nSrc
+          write(6,'(a)') HdrLine(IFa2(j):Ifb2(j))//'|'
+          write(6,'(a)') Line(IFa2(j):Ifb2(j))         
         end if
 920   continue
       if (ReadAlready) then
